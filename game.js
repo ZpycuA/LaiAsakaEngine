@@ -792,17 +792,18 @@ class GameWorld {
     }
   }
 
-   _updatePlayer(dt){
+  _updatePlayer(dt){
   const p = this.player;
   if (!p || !p.alive) return;
 
   const e = this.engine;
 
-  // 修复：右摇杆灵敏度从 300 提升到 600
+  // 处理移动端右摇杆转视角
   if (e.input.joystickRight && e.input.joystickRight.visible) {
     const v = e.input.joystickRight.vector;
     if (v.magnitude > 0.1) {
-      e.cameraCtl.rotate(v.x * dt * 600, v.y * dt * 600);
+      // 配合灵敏度变量
+      e.cameraCtl.rotate(v.x * dt * 800 * e.cameraCtl.sensitivity, v.y * dt * 800 * e.cameraCtl.sensitivity);
     }
   }
 
@@ -823,14 +824,15 @@ class GameWorld {
   p.body.velocity.x = moveX * speed;
   p.body.velocity.z = moveZ * speed;
   
-  // ★ 修复：只要动了，就强行唤醒
   if (moveX !== 0 || moveZ !== 0) p.body.wake();
 
-  // 跳跃保护
+  // ★ 修复跳跃：改用精确射线检测落地
+  const isGrounded = e.physics.isGrounded(p.body.position.x, p.body.position.y, p.body.position.z, p.body.radius);
   const jumpPressed = e.input.keys.has(' ') || e.input.isActive('jump');
-  if (jumpPressed && p.body.position.y <= p.body.radius + 0.1) {
-    p.body.velocity.y = 12;
-    p.body.wake(); // ★ 修复：跳跃也要唤醒
+  
+  if (jumpPressed && isGrounded && p.body.velocity.y <= 0.1) {
+    p.body.velocity.y = 8.5; // 调整跳跃力
+    p.body.wake();
   }
 
   // 角色永远面朝相机前方
@@ -838,6 +840,7 @@ class GameWorld {
 
   this._updateProtection(dt);
 
+  // ... 下面的冷却、开火、技能逻辑保持不变 ...
   for (const sk of p.skills) {
     if (!sk.ready) {
       sk.cd -= dt;
