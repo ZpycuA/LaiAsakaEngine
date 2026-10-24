@@ -1222,7 +1222,14 @@ _updatePlayer(dt){
   if (isPlayer) owner.fireCd = 60 / def.rpm;
   else owner.fireCd = 60 / def.rpm * (0.9 + Math.random() * 0.4);
   if (isPlayer) { weapon.mag--; this.stats.shots++; }
-
+  if (isPlayer) {
+  this.combatLog.push({
+    type: 'shot_fired', t: this.time,
+    weapon: this.engine.i18n.t(def.name),
+    pellets: pellets,
+    energy: baseEnergy,
+  });
+  }
   const baseSpread = def.spread || 0.02;
   const acc = isPlayer ? 1.0 : (owner.spec ? owner.spec.acc : 0.5);
   const spread = baseSpread * (isPlayer ? 1 : (1.5 - acc));
