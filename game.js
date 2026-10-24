@@ -1790,6 +1790,9 @@ _syncMeshes(){
 
   destroy(){
     this.running = false;
+    if (this.player && this.player.weaponGroup) {
+      this.engine.renderer.camera.remove(this.player.weaponGroup);
+    }
     for (const t of this.tracers) {
       this.engine.renderer.scene.remove(t.line);
       t.line.geometry.dispose();
