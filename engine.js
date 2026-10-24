@@ -641,26 +641,31 @@ class VirtualJoystick {
    [9] InputSystem
    ============================================================ */
 class InputSystem {
-    constructor(){
+  constructor(){
     this.keys = new Set();
-    this.mouse = { x: 0, y: 0, left: false, right: false, middle: false, wheel: 0 };
+    this.mouse = { x: 0, y: 0, left: false, right: false, middle: false };
     this.touch = { left: null, right: null };
     this.actions = new Map();
     this.axes = new Map();
     this._bound = false;
     this._canvas = null;
     this.joystickLeft = null;
-    this.joystickRight = null;
     this.enableVirtualJoysticks = false;
     this._touchStartPositions = new Map();
-    this.virtualActions = new Map(); // ★ 加了这一行，至关重要
+    this.virtualActions = new Map();
+    // 视角拖拽逻辑
+    this.dragTouchId = null;
+    this.dragLastPos = { x: 0, y: 0 };
   }
 
   registerAction(name, cfg){ this.actions.set(name, cfg || {}); return this; }
-  registerAxis(name, fn){ this.axes.set(name, fn); return this; }
-  getAxis(name){ const f = this.axes.get(name); return f ? f() : 0; }
+  setActionState(name, active) { this.virtualActions.set(name, active); }
+  isKeyDown(k){ return this.keys.has(k.toLowerCase()); }
 
   isActive(name){
+    if (this.virtualActions.has(name)) {
+      return this.virtualActions.get(name) === true;
+    }
     const cfg = this.actions.get(name);
     if (!cfg) return false;
     if (cfg.keys) {
@@ -668,11 +673,8 @@ class InputSystem {
     }
     if (cfg.mouse === 'left'  && this.mouse.left)  return true;
     if (cfg.mouse === 'right' && this.mouse.right) return true;
-    if (cfg.mouse === 'middle' && this.mouse.middle) return true;
     return false;
   }
-
-  isKeyDown(k){ return this.keys.has(k.toLowerCase()); }
 
   getMoveVector(){
     let mx = 0, mz = 0;
@@ -699,31 +701,7 @@ class InputSystem {
     return { x: mx, z: mz };
   }
 
-  getAimVector(ox, oz, camera){
-    if (this.joystickRight && this.joystickRight.visible) {
-      const v = this.joystickRight.vector;
-      if (v.magnitude > 0.15) return { x: v.x, z: v.y };
-    }
-    if (this.touch.right) {
-      const dx = this.touch.right.x - this.touch.right.ox;
-      const dz = this.touch.right.y - this.touch.right.oy;
-      if (Math.hypot(dx, dz) > 10) return { x: dx, z: dz };
-    }
-    if (camera) {
-      const ray = new THREE.Raycaster();
-      const ndc = new THREE.Vector2(
-        (this.mouse.x / window.innerWidth) * 2 - 1,
-        -(this.mouse.y / window.innerHeight) * 2 + 1
-      );
-      ray.setFromCamera(ndc, camera);
-      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-      const pt = new THREE.Vector3();
-      ray.ray.intersectPlane(plane, pt);
-      if (pt) return { x: pt.x - ox, z: pt.z - oz };
-    }
-    return { x: 0, z: 0 };
-  }
-
+  // 处理屏幕拖拽（弃用旧版，由 game.js 统一接管）
   attach(canvas){
     if (this._bound) return;
     this._bound = true;
@@ -737,6 +715,7 @@ class InputSystem {
     window.addEventListener('keyup', e => this.keys.delete(e.key.toLowerCase()));
     window.addEventListener('blur', () => this.keys.clear());
 
+    // 鼠标控制
     canvas.addEventListener('mousemove', e => {
       this.mouse.x = e.clientX;
       this.mouse.y = e.clientY;
@@ -746,98 +725,32 @@ class InputSystem {
       if (e.button === 1) this.mouse.middle = true;
       if (e.button === 2) this.mouse.right = true;
     });
-    canvas.addEventListener('contextmenu', e => e.preventDefault());
     window.addEventListener('mouseup', e => {
       if (e.button === 0) this.mouse.left = false;
       if (e.button === 1) this.mouse.middle = false;
       if (e.button === 2) this.mouse.right = false;
     });
-    window.addEventListener('wheel', e => { this.mouse.wheel = e.deltaY; }, { passive: true });
-
-    canvas.addEventListener('touchstart', e => this._onTouchStart(e), { passive: false });
-    canvas.addEventListener('touchmove',  e => this._onTouchMove(e),  { passive: false });
-    canvas.addEventListener('touchend',   e => this._onTouchEnd(e),   { passive: false });
-    canvas.addEventListener('touchcancel',e => this._onTouchEnd(e),   { passive: false });
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
   }
 
-    _onTouchStart(e){
-    for (const t of e.changedTouches) {
-      const x = t.clientX, y = t.clientY;
-      const el = document.elementFromPoint(x, y);
-      // 如果摸到了按钮，就不生成摇杆
-      if (el && (el.closest('#mobile-controls') || el.closest('button'))) continue;
-
-      const isLeftSide = x < window.innerWidth * 0.45;
-      if (isLeftSide && !this.touch.left) {
-        this.touch.left = { id: t.identifier, ox: x, oy: y, x, y };
-        if (this.enableVirtualJoysticks) {
-          if (!this.joystickLeft) this.joystickLeft = new VirtualJoystick({ side: 'left' });
-          this.joystickLeft.show(x, y);
-        }
-      } else if (!isLeftSide && !this.touch.right) {
-        this.touch.right = { id: t.identifier, ox: x, oy: y, x, y };
-        if (this.enableVirtualJoysticks) {
-          if (!this.joystickRight) this.joystickRight = new VirtualJoystick({ side: 'right' });
-          this.joystickRight.show(x, y);
-        }
-      }
-      this._touchStartPositions.set(t.identifier, { x, y });
+  // 虚拟摇杆的左下角处理（由 game.js 的 UI 层调用）
+  startLeftStick(x, y, id) {
+    this.touch.left = { id, ox: x, oy: y, x, y };
+    if (this.enableVirtualJoysticks) {
+      if (!this.joystickLeft) this.joystickLeft = new VirtualJoystick({ side: 'left' });
+      this.joystickLeft.show(x, y);
     }
-    e.preventDefault();
   }
-
-  _onTouchMove(e){
-    for (const t of e.changedTouches) {
-      if (this.touch.left && this.touch.left.id === t.identifier) {
-        this.touch.left.x = t.clientX;
-        this.touch.left.y = t.clientY;
-        if (this.joystickLeft && this.joystickLeft.visible) {
-          this.joystickLeft.update(t.clientX, t.clientY);
-        }
-      }
-      if (this.touch.right && this.touch.right.id === t.identifier) {
-        this.touch.right.x = t.clientX;
-        this.touch.right.y = t.clientY;
-        if (this.joystickRight && this.joystickRight.visible) {
-          this.joystickRight.update(t.clientX, t.clientY);
-        }
-      }
+  moveLeftStick(x, y) {
+    if (this.touch.left) {
+      this.touch.left.x = x;
+      this.touch.left.y = y;
+      if (this.joystickLeft) this.joystickLeft.update(x, y);
     }
-    e.preventDefault();
   }
-
-  _onTouchEnd(e){
-    for (const t of e.changedTouches) {
-      if (this.touch.left && this.touch.left.id === t.identifier) {
-        this.touch.left = null;
-        if (this.joystickLeft) this.joystickLeft.hide();
-      }
-      if (this.touch.right && this.touch.right.id === t.identifier) {
-        this.touch.right = null;
-        if (this.joystickRight) this.joystickRight.hide();
-      }
-      this._touchStartPositions.delete(t.identifier);
-    }
-    e.preventDefault();
-  }
-
-    setActionState(name, active) {
-    this.virtualActions.set(name, active);
-  }
-
-  isActive(name){
-    if (this.virtualActions.has(name)) {
-      return this.virtualActions.get(name) === true;
-    }
-    const cfg = this.actions.get(name);
-    if (!cfg) return false;
-    if (cfg.keys) {
-      for (const k of cfg.keys) if (this.keys.has(k)) return true;
-    }
-    if (cfg.mouse === 'left'  && this.mouse.left)  return true;
-    if (cfg.mouse === 'right' && this.mouse.right) return true;
-    if (cfg.mouse === 'middle' && this.mouse.middle) return true;
-    return false;
+  endLeftStick() {
+    this.touch.left = null;
+    if (this.joystickLeft) this.joystickLeft.hide();
   }
 }
 
