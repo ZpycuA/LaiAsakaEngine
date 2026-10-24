@@ -809,21 +809,23 @@ _updatePlayer(dt){
   if (!p || !p.alive) return;
 
   const e = this.engine;
-
-  // 处理移动端右摇杆转视角
-  if (e.input.joystickRight && e.input.joystickRight.visible) {
-    const v = e.input.joystickRight.vector;
-    if (v.magnitude > 0.1) {
-      // 灵敏度放大
-      e.cameraCtl.rotate(v.x * dt * 1500, v.y * dt * 1500);
-    }
-  }
-
   const mv = e.input.getMoveVector();
-  const baseSpeed = p.charSpec.speed * (p.speedMul !== undefined ? p.speedMul : 1);
-  const isSprinting = e.input.keys.has('shift') || e.input.keys.has('shiftleft');
   
-  // 第一人称移动
+  // --- 体力值系统 ---
+  const isMoving = (mv.x !== 0 || mv.z !== 0);
+  const wantsToSprint = e.input.keys.has('shift') || e.input.isActive('sprint');
+  let isSprinting = false;
+  
+  if (isMoving && wantsToSprint && p.stamina > 0) {
+    isSprinting = true;
+    p.stamina = Math.max(0, p.stamina - dt * 15); // 冲刺消耗体力
+  } else {
+    p.stamina = Math.min(p.maxStamina, p.stamina + dt * 10); // 站定/慢走回复体力
+  }
+  
+  const baseSpeed = p.charSpec.speed * (p.speedMul !== undefined ? p.speedMul : 1);
+  const speed = isSprinting ? baseSpeed * 1.6 : baseSpeed; // 冲刺速度加成
+
   const forwardX = Math.sin(e.cameraCtl.yaw);
   const forwardZ = -Math.cos(e.cameraCtl.yaw);
   const rightX = Math.cos(e.cameraCtl.yaw);
@@ -832,16 +834,13 @@ _updatePlayer(dt){
   let moveX = rightX * mv.x + forwardX * -mv.z;
   let moveZ = rightZ * mv.x + forwardZ * -mv.z;
 
-  const speed = isSprinting ? baseSpeed * 1.5 : baseSpeed;
   p.body.velocity.x = moveX * speed;
   p.body.velocity.z = moveZ * speed;
-  
-  if (moveX !== 0 || moveZ !== 0) p.body.wake();
+  if (isMoving) p.body.wake();
 
-  // 可靠的跳跃判断（不要用物理平面射线，直接用高度和速度）
   const jumpPressed = e.input.keys.has(' ') || e.input.isActive('jump');
   if (jumpPressed && p.body.position.y <= p.body.radius + 0.2 && p.body.velocity.y <= 0.1) {
-    p.body.velocity.y = 10; 
+    p.body.velocity.y = 8.5; 
     p.body.wake();
   }
 
