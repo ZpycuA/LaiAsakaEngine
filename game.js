@@ -836,26 +836,59 @@ _updatePlayer(dt){
   if (!p || !p.alive) return;
 
   const e = this.engine;
+
+  // =========================================================
+  // 1. 陀螺仪视角控制
+  // =========================================================
+  if (e.input.gyroEnabled && e.input.enableVirtualJoysticks) {
+    const g = e.input.currentGyro;
+    // 初始化基准角度（第一次开启时的角度作为原点）
+    if (!this._gyroBase) {
+      this._gyroBase = { beta: g.beta || 0, gamma: g.gamma || 0 };
+    } else {
+      const dx = g.gamma - this._gyroBase.gamma;
+      const dy = g.beta - this._gyroBase.beta;
+      
+      // 只有在有微小变化时才执行，防止静态抖动
+      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+        const sens = 2.0 * e.input.gyroSensitivity;
+        e.cameraCtl.rotate(dx * sens, dy * sens);
+        
+        // 平滑跟随，避免过度跳跃（阻尼）
+        this._gyroBase.gamma += dx * 0.5; 
+        this._gyroBase.beta += dy * 0.5;
+      }
+    }
+  }
+
+  // =========================================================
+  // 2. 读取摇杆与体力值处理
+  // =========================================================
   const mv = e.input.getMoveVector();
-  
-  // --- 硬核体力值系统 ---
   const isMoving = (mv.x !== 0 || mv.z !== 0);
-  // 自动疾跑：摇杆推到底（magnitude > 0.9）或者按住Shift
-  const wantsToSprint = e.input.keys.has('shift') || e.input.isActive('sprint') || (e.input.joystickLeft && e.input.joystickLeft.vector.magnitude > 0.9);
   
+  // 自动疾跑：如果摇杆推到底（magnitude > 0.9）或者按住Shift
+  const wantsToSprint = e.input.keys.has('shift') || e.input.isActive('sprint') || (e.input.joystickLeft?.vector.magnitude > 0.9);
   let isSprinting = false;
   
   if (isMoving && wantsToSprint && p.stamina > 5) {
     isSprinting = true;
-    p.stamina = Math.max(0, p.stamina - dt * 12); // 冲刺每秒消耗 12 点
+    // 冲刺每秒消耗 12 点体力
+    p.stamina = Math.max(0, p.stamina - dt * 12); 
   } else {
-    const regen = isMoving ? 5 : 20; // 走路每秒恢复 5，站定每秒恢复 20
+    // 走路每秒恢复 5，站定每秒恢复 20（硬核体力管理）
+    const regen = isMoving ? 5 : 20;
     p.stamina = Math.min(p.maxStamina, p.stamina + dt * regen); 
   }
-  
+
+  // =========================================================
+  // 3. 计算移动向量与速度
+  // =========================================================
   const baseSpeed = p.charSpec.speed * (p.speedMul !== undefined ? p.speedMul : 1);
+  // 冲刺速度加成：1.8倍
   const speed = isSprinting ? baseSpeed * 1.8 : baseSpeed; 
 
+  // 根据相机朝向计算实际移动方向（确保 W 永远是向前）
   const forwardX = Math.sin(e.cameraCtl.yaw);
   const forwardZ = -Math.cos(e.cameraCtl.yaw);
   const rightX = Math.cos(e.cameraCtl.yaw);
@@ -864,20 +897,29 @@ _updatePlayer(dt){
   let moveX = rightX * mv.x + forwardX * -mv.z;
   let moveZ = rightZ * mv.x + forwardZ * -mv.z;
 
+  // 将速度赋予物理刚体
   p.body.velocity.x = moveX * speed;
   p.body.velocity.z = moveZ * speed;
   
+  // 唤醒休眠的物理体
   if (isMoving) p.body.wake();
 
-  // 跳跃
+  // =========================================================
+  // 4. 跳跃
+  // =========================================================
   const jumpPressed = e.input.keys.has(' ') || e.input.isActive('jump');
+  // 简单的地面检测：高度接近地面，且垂直速度向下
   if (jumpPressed && p.body.position.y <= p.body.radius + 0.2 && p.body.velocity.y <= 0.1) {
     p.body.velocity.y = 8.5; 
     p.body.wake();
   }
 
+  // 角色永远面朝相机正前方
   p.angle = e.cameraCtl.yaw;
 
+  // =========================================================
+  // 5. 技能冷却、换弹、开火
+  // =========================================================
   this._updateProtection(dt);
 
   for (const sk of p.skills) {
@@ -904,10 +946,14 @@ _updatePlayer(dt){
   if (e.input.isActive('skill2')) this._useSkill(1);
   if (e.input.isActive('search')) this._trySearchContainer();
 
+  // =========================================================
+  // 6. 边界限制
+  // =========================================================
   const half = this.mapSpec.size / 2 - 1;
   p.body.position.x = Math.max(-half, Math.min(half, p.body.position.x));
   p.body.position.z = Math.max(-half, Math.min(half, p.body.position.z));
 }
+  
 
   _updateProtection(dt){
     const p = this.player;
