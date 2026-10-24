@@ -952,23 +952,26 @@ class GameWorld {
 }
 
   _spawnContainers(){
-    const half = this.mapSpec.size / 2 - 6;
-    const count = 8;
-    for (let i = 0; i < count; i++) {
-      let cx, cz, tries = 0;
-      do {
-        cx = (Math.random() * 2 - 1) * half;
-        cz = (Math.random() * 2 - 1) * half;
-        tries++;
-      } while (Math.hypot(cx, cz) < 8 && tries < 40);
+  const half = this.mapSpec.size / 2 - 6;
+  const count = 8;
+  for (let i = 0; i < count; i++) {
+    let cx, cz, tries = 0;
+    do {
+      cx = (Math.random() * 2 - 1) * half;
+      cz = (Math.random() * 2 - 1) * half;
+      tries++;
+    } while (Math.hypot(cx, cz) < 8 && tries < 40);
 
-      const mesh = this.engine.meshes.build('container', {});
-      mesh.position.x = cx;
-      mesh.position.z = cz;
-      this.engine.renderer.scene.add(mesh);
-      this.containers.push({ x: cx, z: cz, mesh, opened: false });
-    }
+    const mesh = this.engine.meshes.build('container', {});
+    mesh.position.x = cx;
+    mesh.position.z = cz;
+    this.engine.renderer.scene.add(mesh);
+    this.containers.push({ x: cx, z: cz, mesh, opened: false });
+    
+    // ★ 将容器加入小地图兴趣点
+    this.pois.push({ x: cx, z: cz, type: 'container', color: '#ffcc33' });
   }
+}
 
   _registerInputActions(){
     const input = this.engine.input;
