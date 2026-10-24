@@ -735,77 +735,91 @@ class GameWorld {
     }
   }
 
-    _spawnPlayer(){
-    const spec = this.charSpec;
-    const mesh = this.engine.meshes.build('player', spec);
-    this.engine.renderer.scene.add(mesh);
-    
-    // ★ FPS模式隐藏玩家身体
-    mesh.visible = false;
+  _spawnPlayer(){
+  const spec = this.charSpec;
+  const mesh = this.engine.meshes.build('player', spec);
+  this.engine.renderer.scene.add(mesh);
+  
+  // FPS模式隐藏玩家身体
+  mesh.visible = false;
 
-    // ★ 耦合发光特效体（外描边）
-    let auraMesh = null;
-    if (spec.prazer) {
-      auraMesh = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.8, 1.6, 4, 12), // 稍微比人身体大一点
-        new THREE.MeshBasicMaterial({ 
-          color: 0xffffff, 
-          transparent: true, 
-          opacity: 0.5, 
-          side: THREE.BackSide, // 渲染背面，形成外发光感觉
-          depthWrite: false 
-        })
-      );
-      auraMesh.visible = false;
-      auraMesh.position.y = 1.2; // 对齐原模型高度
-      mesh.add(auraMesh); // 挂载到玩家模型上
-    }
-       
-    const body = this.physics.add(new Body({
-      x: 0, z: 0,
-      radius: spec.radius || 1.2,
-      mass: 70,
-      restitution: 0.1,
-      friction: 6,
-      userData: { type: 'player' },
-    }));
+  const body = this.physics.add(new Body({
+    x: 0, z: 0,
+    radius: spec.radius || 1.2,
+    mass: 70,
+    restitution: 0.1,
+    friction: 6,
+    userData: { type: 'player' },
+  }));
 
-    this.player = {
-      mesh, body,auraMesh,
-      charSpec: spec,
-      charId: spec.id,
-      hp: spec.hp,
-      maxHp: spec.hp,
-      coupling: 100,
-      maxCoupling: 100,
-      protection: null,
-      protectionHold: false,
-      angle: 0,
-      weapon: this._buildWeapon(spec.weapon),
-      sidearm: spec.sidearm ? this._buildWeapon(spec.sidearm) : null,
-      usingSidearm: false,
-      fireCd: 0,
-      reloading: 0,
-      reloadTime: 0,
-      alive: true,
-      kills: 0,
-      dealt: 0,
-      taken: 0,
-      carriedValue: 0,
-      limbDamage: 0,
-      speedMul: 1,
-      stamina: 100,      // ★ 加上这个
-      maxStamina: 100,   // ★ 加上这个
-      armor: {
-        shell: { lv: 3, dur: 100, max: 100 },
-        visor: { lv: 3, dur: 100, max: 100 },
-        fiber: { lv: 4, dur: 100, max: 100 },
-        plate: { lv: 4, dur: 100, max: 100 },
-      },
-      skills: this._buildSkills(spec.skills || []),
-    };
-    this.player.body.userData.ref = this.player;
+  // ★ 生成 FPS 视图武器（挂载在相机上）
+  const weaponGroup = new THREE.Group();
+  
+  // 枪身
+  const gunMat = new THREE.MeshStandardMaterial({ color: 0x2b3542, metalness: 0.6, roughness: 0.4 });
+  const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.15, 0.6), gunMat);
+  gunBody.position.set(0, 0, -0.3);
+  
+  // 枪管
+  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.4), gunMat);
+  barrel.position.set(0, 0.05, -0.7);
+  
+  // 握把
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.2, 0.1), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+  grip.position.set(0, -0.15, 0.1);
+  
+  // 瞄准镜
+  const scope = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.2), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+  scope.position.set(0, 0.12, -0.3);
+
+  weaponGroup.add(gunBody, barrel, grip, scope);
+  
+  // 把武器挂载到相机的子节点（位置放在右下角）
+  weaponGroup.position.set(0.25, -0.2, -0.4);
+  this.engine.renderer.camera.add(weaponGroup);
+
+  this.player = {
+    mesh, body,
+    weaponGroup, // ★ 存入玩家对象
+    charSpec: spec,
+    charId: spec.id,
+    hp: spec.hp,
+    maxHp: spec.hp,
+    coupling: 100,
+    maxCoupling: 100,
+    protection: null,
+    protectionHold: false,
+    angle: 0,
+    weapon: this._buildWeapon(spec.weapon),
+    sidearm: spec.sidearm ? this._buildWeapon(spec.sidearm) : null,
+    usingSidearm: false,
+    fireCd: 0,
+    reloading: 0,
+    reloadTime: 0,
+    alive: true,
+    kills: 0,
+    dealt: 0,
+    taken: 0,
+    carriedValue: 0,
+    limbDamage: 0,
+    speedMul: 1,
+    stamina: 100,
+    maxStamina: 100,
+    armor: {
+      shell: { lv: 3, dur: 100, max: 100 },
+      visor: { lv: 3, dur: 100, max: 100 },
+      fiber: { lv: 4, dur: 100, max: 100 },
+      plate: { lv: 4, dur: 100, max: 100 },
+    },
+    skills: this._buildSkills(spec.skills || []),
+  };
+  this.player.body.userData.ref = this.player;
+
+  // 将整个相机加入场景（否则相机子节点无法显示）
+  if (!this.engine.renderer.scene.children.includes(this.engine.renderer.camera)) {
+    this.engine.renderer.scene.add(this.engine.renderer.camera);
   }
+}
 
   _buildWeapon(id){
     const def = this.engine.content.get('weapons', id);
