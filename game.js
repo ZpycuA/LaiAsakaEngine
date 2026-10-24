@@ -788,32 +788,44 @@ class GameWorld {
     }
   }
 
-    _updatePlayer(dt){
+      _updatePlayer(dt){
     const p = this.player;
     if (!p || !p.alive) return;
 
-    const mv = this.engine.input.getMoveVector();
-    const baseSpeed = p.charSpec.speed;
-    const speedMul = p.speedMul !== undefined ? p.speedMul : 1;
+    const e = this.engine;
 
+    // ★ 处理移动端右摇杆转视角
+    if (e.input.joystickRight && e.input.joystickRight.visible) {
+      const v = e.input.joystickRight.vector;
+      if (v.magnitude > 0.1) {
+        e.cameraCtl.rotate(v.x * dt * 300, v.y * dt * 300);
+      }
+    }
+
+    // 移动方向基于相机朝向
+    const mv = e.input.getMoveVector();
+    const baseSpeed = p.charSpec.speed * (p.speedMul !== undefined ? p.speedMul : 1);
+    const isSprinting = e.input.keys.has('shift') || e.input.keys.has('shiftleft');
+    
     const camForward = new THREE.Vector3();
-    this.engine.renderer.camera.getWorldDirection(camForward);
-    camForward.y = 0;
-    camForward.normalize();
+    e.renderer.camera.getWorldDirection(camForward);
+    camForward.y = 0; camForward.normalize();
     const camRight = new THREE.Vector3().crossVectors(camForward, new THREE.Vector3(0, 1, 0)).normalize();
 
     let moveX = camRight.x * mv.x + camForward.x * -mv.z;
     let moveZ = camRight.z * mv.x + camForward.z * -mv.z;
 
-    p.body.velocity.x = moveX * baseSpeed * speedMul;
-    p.body.velocity.z = moveZ * baseSpeed * speedMul;
+    const speed = isSprinting ? baseSpeed * 1.5 : baseSpeed;
+    p.body.velocity.x = moveX * speed;
+    p.body.velocity.z = moveZ * speed;
 
-    const aim = this.engine.input.getAimVector(p.body.position.x, p.body.position.z, this.engine.renderer.camera);
-    if (Math.abs(aim.x) > 0.01 || Math.abs(aim.z) > 0.01) {
-      p.angle = Math.atan2(aim.z, aim.x);
-    } else if (moveX !== 0 || moveZ !== 0) {
-      p.angle = Math.atan2(moveZ, moveX);
+    // 跳跃
+    if (e.input.keys.has(' ') && p.body.position.y <= p.body.radius + 0.1) {
+      p.body.velocity.y = 12;
     }
+
+    // 角色面朝相机前方
+    p.angle = e.cameraCtl.yaw;
 
     this._updateProtection(dt);
 
@@ -829,18 +841,17 @@ class GameWorld {
       if (p.reloading <= 0) this._finishReload();
     } else {
       if (p.fireCd > 0) p.fireCd -= dt;
-      const firing = this.engine.input.isActive('fire');
-      if (firing && p.fireCd <= 0 && p.weapon) {
+      if (e.input.isActive('fire') && p.fireCd <= 0 && p.weapon) {
         if (p.weapon.mag <= 0) this._startReload();
         else this._fireWeapon(p, p.weapon, true);
       }
     }
 
-    if (this.engine.input.isActive('reload')) this._startReload();
-    if (this.engine.input.isActive('switchWeapon') && p.sidearm) this._switchWeapon();
-    if (this.engine.input.isActive('skill1')) this._useSkill(0);
-    if (this.engine.input.isActive('skill2')) this._useSkill(1);
-    if (this.engine.input.isActive('search')) this._trySearchContainer();
+    if (e.input.isActive('reload')) this._startReload();
+    if (e.input.isActive('switchWeapon') && p.sidearm) this._switchWeapon();
+    if (e.input.isActive('skill1')) this._useSkill(0);
+    if (e.input.isActive('skill2')) this._useSkill(1);
+    if (e.input.isActive('search')) this._trySearchContainer();
 
     const half = this.mapSpec.size / 2 - 1;
     p.body.position.x = Math.max(-half, Math.min(half, p.body.position.x));
