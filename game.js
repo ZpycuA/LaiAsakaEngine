@@ -311,15 +311,16 @@ class HUDSystem {
   }
 
   _initEls(){
-    if (this._els) return;
-    this._els = {
-      hpRow: document.querySelector('#hp-bar')?.closest('.stat-row'),
-      cpRow: document.getElementById('cp-row'),
-      ammoEl: document.getElementById('bottom-right'),
-      taskPanel: document.getElementById('task-panel'),
-      crosshair: document.getElementById('crosshair'),
-    };
-  }
+  if (this._els) return;
+  this._els = {
+    hpRow: document.querySelector('#hp-bar')?.closest('.stat-row'),
+    cpRow: document.getElementById('cp-row'),
+    ammoEl: document.getElementById('bottom-right'),
+    // ★ 修复：之前找的是 id="task-panel"，但 HTML 里是 class="task-panel"
+    taskPanel: document.querySelector('.task-panel'), 
+    crosshair: document.getElementById('crosshair'),
+  };
+}
 
   _bindProtectionButtons(){
     if (this._protectBtns) return;
