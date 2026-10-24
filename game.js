@@ -1982,10 +1982,19 @@ export class GameApp {
   }
 
   boot(){
-    this._setupMenu();
-    this._bindGlobalHandlers();
-    this._registerDevCommands();
+  // ★ 初始化存档（原代码 boot 里没有调用 save.load，data 一直是 null）
+  if (!this.engine.save.data) {
+    this.engine.save.load({
+      version: 1,
+      credits: 0,
+      stats: { runs: 0, extracts: 0, deaths: 0, kills: 0 },
+      flags: {},
+    });
   }
+  this._setupMenu();
+  this._bindGlobalHandlers();
+  this._registerDevCommands();
+}
 
       _setupMenu(){
     const e = this.engine;
