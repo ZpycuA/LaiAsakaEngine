@@ -1378,39 +1378,53 @@ _damageEnemy(enemy, energy, pen, isHead = false){
   }
 }
 
- _damagePlayer(player, energy, pen){
+ _damagePlayer(player, energy, pen, isHead = false, srcX, srcZ, sourceEnt = null){
   if (!player.alive) return;
 
   const profile = this.engine.profile;
+  const hpBefore = player.hp;
+
+  /* 1. 耦合防护 */
   const coup = CombatSystem.applyCoupling(player, energy, 'ballistic');
   if (coup.cost > 0) player.coupling = Math.max(0, player.coupling - coup.cost);
+  const couplingSnapshot = (coup.absorbed > 0) ? {
+    level: player.protection || '?',
+    absorbed: coup.absorbed,
+    cost: coup.cost,
+  } : null;
   let remaining = coup.remaining;
 
-  // 记录受击方向
-  const srcX = (pen !== undefined && arguments[3] !== undefined) ? arguments[3] : player.body.position.x + 1;
-const srcZ = (arguments[4] !== undefined) ? arguments[4] : player.body.position.z + 1;
-const ang = Math.atan2(srcZ - player.body.position.z, srcX - player.body.position.x);
-this.lastHitDir = ang - this.engine.cameraCtl.yaw;
-this.lastHitTime = this.time;
-    
-  const plate = CombatSystem.applyArmor(player.armor.plate, remaining, pen);
-  remaining = plate.remaining;
-  const fiber = CombatSystem.applyArmor(player.armor.fiber, remaining, pen);
-  remaining = fiber.remaining;
+  /* 2. 记录受击方向（修复 ox/oz bug） */
+  if (srcX !== undefined && srcZ !== undefined) {
+    const ang = Math.atan2(srcZ - player.body.position.z, srcX - player.body.position.x);
+    this.lastHitDir = ang - this.engine.cameraCtl.yaw;
+    this.lastHitTime = this.time;
+  }
 
-  const isHead = Math.random() < 0.05;
+  /* 3. 护甲层吸收：先插板，后纤维 */
+  const plateBefore = { lv: player.armor.plate.lv, dur: player.armor.plate.dur };
+  const plateRes = CombatSystem.applyArmor(player.armor.plate, remaining, pen);
+  const plateAfter = { dur: player.armor.plate.dur, broke: player.armor.plate.dur <= 0 };
+  remaining = plateRes.remaining;
+  const fiberBefore = { lv: player.armor.fiber.lv, dur: player.armor.fiber.dur };
+  const fiberRes = CombatSystem.applyArmor(player.armor.fiber, remaining, pen);
+  const fiberAfter = { dur: player.armor.fiber.dur, broke: player.armor.fiber.dur <= 0 };
+  remaining = fiberRes.remaining;
+
+  /* 4. 头部倍率 */
   if (isHead) remaining *= COMBAT.HEAD_MULT;
 
-  // ★ 修复：爆头即死时，伤害刚好等于玩家当前血量，不再无限溢出
+  /* 5. 爆头即死（profile 开关） */
   if (isHead && profile.get('combat.headshotInstantKill', false)) {
     remaining = player.hp * COMBAT.BODY_COEFF_HUMAN;
   }
 
+  /* 6. 折算 HP 伤害 */
   const dmg = CombatSystem.energyToHP(remaining, player.charSpec.prazer);
   player.hp -= dmg;
   player.taken += dmg;
 
-  // ★ [Profile] 四肢伤害
+  /* 7. 四肢伤害（profile 开关） */
   if (profile.get('combat.limbDamage', false)) {
     player.limbDamage = (player.limbDamage || 0) + 1;
     if (player.limbDamage >= 4) {
@@ -1418,13 +1432,45 @@ this.lastHitTime = this.time;
     }
   }
 
+  /* ---- 战斗日志：承受伤害 ---- */
+  let armorSnapshot = null;
+  if (plateRes.absorbed > 0 && plateBefore.lv > 0) {
+    armorSnapshot = {
+      layer: '插板', lv: plateBefore.lv,
+      absorbed: plateRes.absorbed,
+      wear: plateBefore.dur - plateAfter.dur,
+      broke: plateAfter.broke,
+    };
+  } else if (fiberRes.absorbed > 0 && fiberBefore.lv > 0) {
+    armorSnapshot = {
+      layer: '纤维', lv: fiberBefore.lv,
+      absorbed: fiberRes.absorbed,
+      wear: fiberBefore.dur - fiberAfter.dur,
+      broke: fiberAfter.broke,
+    };
+  }
+  this.combatLog.push({
+    type: 'damage_taken',
+    t: this.time,
+    source: sourceEnt ? { name: this.engine.i18n.t(sourceEnt.spec ? sourceEnt.spec.name : '敌人') } : { name: '未知' },
+    amount: dmg,
+    part: isHead ? 'head' : 'thorax',
+    pierced: pen >= 3,
+    armor: armorSnapshot,
+    coupling: couplingSnapshot,
+    hpBefore: hpBefore,
+    hpAfter: Math.max(0, player.hp),
+    maxHp: player.maxHp,
+    bleeding: false,
+  });
+
   this._spawnDamageNumber(player.body.position.x, player.body.position.z, Math.round(dmg), 'player');
   this._hurtFX();
   this.engine.cameraCtl.shake(0.4, 0.15);
   this._playSFX('hurt', { volume: 0.5 });
 
   if (player.hp <= 0 && player.alive) this._playerDown();
-}
+ }
 
  _killEnemy(enemy, dmg, dist){
   enemy.alive = false;
