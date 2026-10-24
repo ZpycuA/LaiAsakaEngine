@@ -1330,26 +1330,50 @@ _raycastBullet(owner, ox, oy, oz, dirX, dirY, dirZ, baseEnergy, range, weaponDef
     this._fireWeapon(enemy, enemy.weapon, false);
   }
 
- _damageEnemy(enemy, energy, pen, isHead = false){
+_damageEnemy(enemy, energy, pen, isHead = false){
   if (!enemy.alive) return;
   const profile = this.engine.profile;
   
   let finalEnergy = isHead ? energy * COMBAT.HEAD_MULT : energy;
   if (isHead && profile.get('combat.headshotInstantKill', false)) {
-    finalEnergy = enemy.maxHp * COMBAT.BODY_COEFF_HUMAN; 
+    finalEnergy = enemy.maxHp * COMBAT.BODY_COEFF_HUMAN;
   }
 
   const dmg = CombatSystem.energyToHP(finalEnergy, false);
+  const hpBefore = enemy.hp;
   enemy.hp -= dmg;
   enemy.hitFlash = 0.15;
   this.player.dealt += dmg;
   this.stats.hits++;
   
-  // ★ 命中标记反馈
   this._hitMarker(isHead);
 
+  /* ---- 战斗日志：造成伤害 ---- */
+  const part = isHead ? 'head' : 'thorax';
+  this.combatLog.push({
+    type: 'damage_dealt',
+    t: this.time,
+    target: {
+      name: this.engine.i18n.t(enemy.spec.name),
+      isBoss: false,
+      isElite: false,
+    },
+    amount: dmg,
+    part,
+    weapon: this.currentWeapon ? { name: this.engine.i18n.t(this.currentWeapon.def.name) } : null,
+    headshot: isHead,
+    pierced: pen >= 3,
+    armor: null, // 当前敌人没有护甲系统；接入后填 { lv, absorbed, wear, broke }
+    targetHpBefore: hpBefore,
+    targetHpAfter: Math.max(0, enemy.hp),
+    targetMaxHp: enemy.maxHp,
+  });
+
   if (enemy.hp <= 0 && enemy.alive) {
-    const dist = Math.round(Math.hypot(this.player.body.position.x - enemy.body.position.x, this.player.body.position.z - enemy.body.position.z));
+    const dist = Math.round(Math.hypot(
+      this.player.body.position.x - enemy.body.position.x,
+      this.player.body.position.z - enemy.body.position.z
+    ));
     this._killEnemy(enemy, dmg, dist);
   }
 }
