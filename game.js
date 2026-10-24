@@ -1940,34 +1940,32 @@ export class GameApp {
     }
     return ok;
   }
-      _bindCameraControls() {
-    if (this._camBound) return;
-    this._camBound = true;
-    let isDragging = false;
-    let lastX = 0, lastY = 0;
-    const canvas = this.engine.renderer.canvas;
+    _bindCameraControls() {
+  if (this._camBound) return;
+  this._camBound = true;
+  let isDragging = false;
+  let lastX = 0, lastY = 0;
+  const canvas = this.engine.renderer.canvas;
 
-    canvas.addEventListener('pointerdown', (e) => {
-      // 只有 PC 鼠标右键才允许拖拽
-      if (e.pointerType === 'mouse' && e.button === 2) {
-        isDragging = true;
-        lastX = e.clientX; lastY = e.clientY;
-      }
-    });
+  canvas.addEventListener('pointerdown', (e) => {
+    // 左键和右键都可以拖拽
+    isDragging = true;
+    lastX = e.clientX; lastY = e.clientY;
+  });
 
-    window.addEventListener('pointermove', (e) => {
-      if (!isDragging) return;
-      const dx = e.clientX - lastX;
-      const dy = e.clientY - lastY;
-      lastX = e.clientX; lastY = e.clientY;
-      if (this.engine.cameraCtl) this.engine.cameraCtl.rotate(dx, dy);
-    });
+  window.addEventListener('pointermove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    if (this.engine.cameraCtl) this.engine.cameraCtl.rotate(dx, dy);
+  });
 
-    window.addEventListener('pointerup', (e) => { 
-      if (e.button === 2) isDragging = false; 
-    });
-    window.addEventListener('contextmenu', e => e.preventDefault());
-  }
+  window.addEventListener('pointerup', () => { 
+    isDragging = false; 
+  });
+  window.addEventListener('contextmenu', e => e.preventDefault());
+}
 
  _renderCustomSettings(){
   const el = document.getElementById('custom-settings');
