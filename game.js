@@ -685,44 +685,51 @@ class GameWorld {
     }
   }
 
-  _spawnEnemy(spec, x, z, diffMul){
-    // ★ [Profile] 敌人强度随实时难度
-    const assessment = this.engine.profile.assess();
-    const profileMul = 0.5 + assessment.score;   // 0.5 ~ 1.5
+ _spawnEnemy(spec, x, z, diffMul){
+  const assessment = this.engine.profile.assess();
+  const profileMul = 0.5 + assessment.score;
 
-    const mesh = this.engine.meshes.build('enemy', spec);
-    this.engine.renderer.scene.add(mesh);
+  const mesh = this.engine.meshes.build('enemy', spec);
+  
+  // ★ 核心修复：克隆材质，杜绝所有敌人共享一个材质导致一起变白
+  mesh.traverse(obj => {
+    if (obj.isMesh) {
+      obj.material = obj.material.clone();
+    }
+  });
+  
+  this.engine.renderer.scene.add(mesh);
 
-    const body = this.physics.add(new Body({
-      x, z,
-      radius: spec.radius || 1.2,
-      mass: 60,
-      restitution: 0.1,
-      friction: 5,
-      userData: { type: 'enemy' },
-    }));
+  const body = this.physics.add(new Body({
+    x, z,
+    radius: spec.radius || 1.2,
+    mass: 60,
+    restitution: 0.1,
+    friction: 5,
+    userData: { type: 'enemy' },
+  }));
 
-    const enemy = {
-      mesh, body, spec,
-      hp: spec.hp * diffMul * profileMul,
-      maxHp: spec.hp * diffMul * profileMul,
-      angle: Math.random() * Math.PI * 2,
-      weapon: this._buildWeapon(spec.weapon),
-      fireCd: 0.5 + Math.random() * 1.0,
-      alive: true,
-      awareness: 0,
-      state: 'patrol',
-      stateT: 0,
-      wanderT: 1 + Math.random() * 2,
-      wanderDir: Math.random() * Math.PI * 2,
-      strafeDir: Math.random() < 0.5 ? 1 : -1,
-      strafeT: 0.7 + Math.random() * 1.2,
-      hitFlash: 0,
-      trainingDummy: this.kind === 'training',
-    };
-    body.userData.ref = enemy;
-    this.enemies.push(enemy);
-  }
+  const enemy = {
+    mesh, body, spec,
+    hp: spec.hp * diffMul * profileMul,
+    maxHp: spec.hp * diffMul * profileMul,
+    angle: Math.random() * Math.PI * 2,
+    weapon: this._buildWeapon(spec.weapon),
+    fireCd: 0.5 + Math.random() * 1.0,
+    alive: true,
+    awareness: 0,
+    state: 'patrol',
+    stateT: 0,
+    wanderT: 1 + Math.random() * 2,
+    wanderDir: Math.random() * Math.PI * 2,
+    strafeDir: Math.random() < 0.5 ? 1 : -1,
+    strafeT: 0.7 + Math.random() * 1.2,
+    hitFlash: 0,
+    trainingDummy: this.kind === 'training',
+  };
+  body.userData.ref = enemy;
+  this.enemies.push(enemy);
+}
 
   _spawnExtracts(){
     const half = this.mapSpec.size / 2 - 4;
