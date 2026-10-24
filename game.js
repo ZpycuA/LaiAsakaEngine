@@ -1514,6 +1514,12 @@ _addKillFeed(name, dmg, dist) {
 }
 
   _playerDown(){
+    this.combatLog.push({
+  type: 'downed',
+  t: this.time,
+  hp: p.hp,
+  maxHp: p.maxHp,
+});
     const p = this.player;
     p.alive = false;
     this._processModeHook('onPlayerDowned');
