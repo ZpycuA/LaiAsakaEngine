@@ -767,30 +767,35 @@ class GameWorld {
     input.registerAction('skill2', { keys: ['e'] });
   }
 
-  update(dt){
-    if (!this.running || this.paused) return;
-    this.time += dt;
+ update(dt){
+  if (!this.running || this.paused) return;
+  this.time += dt;
 
-    this.tasks.tickSurvive(dt);
-    this._updatePlayer(dt);
-    this._updateEnemies(dt);
-    this._updateExtracts(dt);
-    this._updateContainers(dt);
-    this._updateTracers(dt);
+  this.tasks.tickSurvive(dt);
+  this._updatePlayer(dt);
+  this._updateEnemies(dt);
+  this._updateExtracts(dt);
+  this._updateContainers(dt);
+  this._updateTracers(dt);
 
-    this.physics.step(dt);
-    this._syncMeshes();
+  this.physics.step(dt);
+  this._syncMeshes();
 
-    if (this.player) {
-      this.engine.cameraCtl.follow(this.player.body.position.x, this.player.body.position.z);
-    }
-    this.hud.update();
-
-    if (this.timeLimit > 0 && this.time >= this.timeLimit) {
-      this._log('时间耗尽', 'r');
-      this._end(false);
-    }
+  if (this.player) {
+    // ★ 眼睛高度设为物理体 Y 坐标 + 1.5
+    this.engine.cameraCtl.follow(
+      this.player.body.position.x, 
+      this.player.body.position.y + 1.5, 
+      this.player.body.position.z
+    );
   }
+  this.hud.update();
+
+  if (this.timeLimit > 0 && this.time >= this.timeLimit) {
+    this._log('时间耗尽', 'r');
+    this._end(false);
+  }
+}
 
   _updatePlayer(dt){
   const p = this.player;
