@@ -1874,11 +1874,12 @@ export class GameApp {
     }
   }
 
-  _quitToMenu(){
+    _quitToMenu(){
     if (this.world) {
       try { this.world.destroy(); } catch (e) { console.warn(e); }
       this.world = null;
     }
+    document.getElementById('mobile-controls').style.display = 'none';
     this._showScreen('menu');
     if (this.engine.save.refreshMenu) this.engine.save.refreshMenu();
   }
