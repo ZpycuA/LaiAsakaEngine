@@ -1384,42 +1384,52 @@ class PhysicsWorld {
     }
   }
   _integrate(dt){
-    const g = this.gravity;
-    for (const b of this.dynamicBodies) {
-      if (b.isStatic || !b.alive) continue;
-      if (this.enableSleep && b.allowSleep) {
-        const speed2 = b.velocity.x ** 2 + b.velocity.z ** 2;
-        if (speed2 < b.sleepThreshold ** 2 && !b.sleeping) {
-          b.sleepTimer += dt;
-          if (b.sleepTimer > b.sleepTime) {
-            b.sleeping = true;
-            b.velocity.x = 0;
-            b.velocity.z = 0;
-          }
-        } else {
-          b.sleepTimer = 0;
-        }
-      }
-      if (b.sleeping) continue;
-      if (!b.ignoreGravity) {
-        b.velocity.x += (g.x + b.force.x * b.invMass) * dt;
-        b.velocity.y += (g.y + b.force.y * b.invMass) * dt;
-        b.velocity.z += (g.z + b.force.z * b.invMass) * dt;
+  const g = this.gravity;
+  for (const b of this.dynamicBodies) {
+    if (b.isStatic || !b.alive) continue;
+    
+    // ★ 修复：如果有了速度，必须自动唤醒，防止卡在休眠状态
+    if (b.sleeping) {
+      if (b.velocity.x !== 0 || b.velocity.y !== 0 || b.velocity.z !== 0 || b.force.x !== 0 || b.force.z !== 0) {
+        b.wake();
       } else {
-        b.velocity.x += b.force.x * b.invMass * dt;
-        b.velocity.z += b.force.z * b.invMass * dt;
+        continue;
       }
-      if (b.friction > 0) {
-        const f = Math.max(0, 1 - b.friction * dt);
-        b.velocity.x *= f;
-        b.velocity.z *= f;
-      }
-      b.position.x += b.velocity.x * dt;
-      b.position.y += b.velocity.y * dt;
-      b.position.z += b.velocity.z * dt;
-      b.force.x = 0; b.force.y = 0; b.force.z = 0;
     }
+
+    if (this.enableSleep && b.allowSleep) {
+      const speed2 = b.velocity.x ** 2 + b.velocity.z ** 2;
+      if (speed2 < b.sleepThreshold ** 2 && !b.sleeping) {
+        b.sleepTimer += dt;
+        if (b.sleepTimer > b.sleepTime) {
+          b.sleeping = true;
+          b.velocity.x = 0;
+          b.velocity.z = 0;
+        }
+      } else {
+        b.sleepTimer = 0;
+      }
+    }
+    
+    if (!b.ignoreGravity) {
+      b.velocity.x += (g.x + b.force.x * b.invMass) * dt;
+      b.velocity.y += (g.y + b.force.y * b.invMass) * dt;
+      b.velocity.z += (g.z + b.force.z * b.invMass) * dt;
+    } else {
+      b.velocity.x += b.force.x * b.invMass * dt;
+      b.velocity.z += b.force.z * b.invMass * dt;
+    }
+    if (b.friction > 0) {
+      const f = Math.max(0, 1 - b.friction * dt);
+      b.velocity.x *= f;
+      b.velocity.z *= f;
+    }
+    b.position.x += b.velocity.x * dt;
+    b.position.y += b.velocity.y * dt;
+    b.position.z += b.velocity.z * dt;
+    b.force.x = 0; b.force.y = 0; b.force.z = 0;
   }
+}
   _canCollide(a, b){
     if ((a.mask & b.layer) === 0) return false;
     if ((b.mask & a.layer) === 0) return false;
