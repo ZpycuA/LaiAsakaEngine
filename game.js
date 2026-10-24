@@ -1521,69 +1521,35 @@ export class GameApp {
     this._registerDevCommands();
   }
 
-    _setupMenu(){
+      _setupMenu(){
     const e = this.engine;
     const i18n = e.i18n;
 
-    this._renderOptions(
-      'mode-options',
-      e.modeRegistry.all(),
-      (item) => item.id === this.menuState.mode,
-      (item) => ({ title: i18n.t(item.name), sub: i18n.t(item.desc || ''), tag: '', value: item.id }),
-      (item) => { this.menuState.mode = item.id; this._updateModeHint(); }
-    );
+    this._renderOptions('mode-options', e.modeRegistry.all(), (i) => i.id === this.menuState.mode, (i) => ({ title: i18n.t(i.name), sub: i18n.t(i.desc || ''), tag: '', value: i.id }), (i) => { this.menuState.mode = i.id; this._updateModeHint(); });
+    this._renderOptions('map-options', e.content.all('maps'), (i) => i.id === this.menuState.map, (i) => ({ title: i18n.t(i.name), sub: `${i.size}m² · ${i.enemyCount} 敌人`, tag: '', value: i.id }), (i) => { this.menuState.map = i.id; });
+    
+    const diffs = [ { id: 'easy', name: 'difficulty.easy.name', desc: '敌人弱 · 数量少' }, { id: 'normal', name: 'difficulty.normal.name', desc: '标准' }, { id: 'hard', name: 'difficulty.hard.name', desc: '敌人强 · 数量多' }, { id: 'nightmare', name: 'difficulty.nightmare.name', desc: '极端难度' }];
+    this._renderOptions('diff-options', diffs, (i) => i.id === this.menuState.diff, (i) => ({ title: i18n.t(i.name), sub: i.desc, tag: '', value: i.id }), (i) => { this.menuState.diff = i.id; });
+    
+    this._renderOptions('char-options', e.content.all('characters'), (i) => i.id === this.menuState.char, (i) => ({ title: i18n.t(i.name), sub: i18n.t(i.tag), tag: i.weapon, value: i.id }), (i) => { this.menuState.char = i.id; });
+    this._renderOptions('profile-options', e.profile.list(), (i) => i.id === this.menuState.profile, (i) => ({ title: i18n.t(i.name), sub: i18n.t(i.desc || ''), tag: '', value: i.id }), (i) => { this.menuState.profile = i.id; e.profile.setProfile(i.id); this._updateDifficultyDisplay(); });
 
-    this._renderOptions(
-      'map-options',
-      e.content.all('maps'),
-      (item) => item.id === this.menuState.map,
-      (item) => ({ title: i18n.t(item.name), sub: `${item.size}m² · ${item.enemyCount} 敌人`, tag: '', value: item.id }),
-      (item) => { this.menuState.map = item.id; }
-    );
-
-    const diffs = [
-      { id: 'easy', name: 'difficulty.easy.name', desc: '敌人弱 · 数量少' },
-      { id: 'normal', name: 'difficulty.normal.name', desc: '标准' },
-      { id: 'hard', name: 'difficulty.hard.name', desc: '敌人强 · 数量多' },
-      { id: 'nightmare', name: 'difficulty.nightmare.name', desc: '极端难度' },
-    ];
-    this._renderOptions(
-      'diff-options',
-      diffs,
-      (item) => item.id === this.menuState.diff,
-      (item) => ({ title: i18n.t(item.name), sub: item.desc, tag: '', value: item.id }),
-      (item) => { this.menuState.diff = item.id; }
-    );
-
-    this._renderOptions(
-      'char-options',
-      e.content.all('characters'),
-      (item) => item.id === this.menuState.char,
-      (item) => ({ title: i18n.t(item.name), sub: i18n.t(item.tag), tag: item.weapon, value: item.id }),
-      (item) => { this.menuState.char = item.id; }
-    );
-
-    this._renderOptions(
-      'profile-options',
-      e.profile.list(),
-      (item) => item.id === this.menuState.profile,
-      (item) => ({ title: i18n.t(item.name), sub: i18n.t(item.desc || ''), tag: '', value: item.id }),
-      (item) => {
-        this.menuState.profile = item.id;
-        e.profile.setProfile(item.id);
-        this._updateDifficultyDisplay();
-      }
-    );
+    // ★ 平台选择绑定
+    const platEl = document.getElementById('platform-options');
+    if (platEl) {
+      platEl.querySelectorAll('.option').forEach(el => {
+        el.onclick = () => {
+          platEl.querySelectorAll('.option').forEach(x => x.classList.remove('on'));
+          el.classList.add('on');
+          this.platform = el.dataset.value;
+        };
+      });
+    }
 
     this._renderCustomSettings();
-
     e.profile.setProfile(this.menuState.profile);
     this._updateDifficultyDisplay();
-    e.profile.onChange(() => {
-      this._updateDifficultyDisplay();
-      this._syncCustomSettingsUI();
-    });
-
+    e.profile.onChange(() => { this._updateDifficultyDisplay(); this._syncCustomSettingsUI(); });
     this._updateModeHint();
     this._menuReady = true;
   }
