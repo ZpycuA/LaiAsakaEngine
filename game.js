@@ -892,58 +892,52 @@ _updatePlayer(dt){
 
   const e = this.engine;
 
-  // =========================================================
-  // 1. 陀螺仪视角控制
-  // =========================================================
-  if (e.input.gyroEnabled && e.input.enableVirtualJoysticks) {
+  // ★ 1. 陀螺仪视角控制（增量计算，防飘防抖）
+  if (e.input.gyroEnabled) {
     const g = e.input.currentGyro;
-    // 初始化基准角度（第一次开启时的角度作为原点）
     if (!this._gyroBase) {
-      this._gyroBase = { beta: g.beta || 0, gamma: g.gamma || 0 };
+      this._gyroBase = { beta: g.beta, gamma: g.gamma };
     } else {
+      // 获取相对上次的增量
       const dx = g.gamma - this._gyroBase.gamma;
       const dy = g.beta - this._gyroBase.beta;
       
-      // 只有在有微小变化时才执行，防止静态抖动
-      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-        const sens = 2.0 * e.input.gyroSensitivity;
+      // 死区过滤，防止静止时画面自己抖
+      if (Math.abs(dx) > 0.15 || Math.abs(dy) > 0.15) {
+        const sens = 3.0 * e.input.gyroSensitivity;
         e.cameraCtl.rotate(dx * sens, dy * sens);
         
-        // 平滑跟随，避免过度跳跃（阻尼）
-        this._gyroBase.gamma += dx * 0.5; 
-        this._gyroBase.beta += dy * 0.5;
+        // 立即更新基准点，防止累积过度导致瞬间翻转
+        this._gyroBase.gamma = g.gamma;
+        this._gyroBase.beta = g.beta;
       }
     }
   }
 
-  // =========================================================
-  // 2. 读取摇杆与体力值处理
-  // =========================================================
+  // ★ 2. 硬核体力值系统与自动疾跑
   const mv = e.input.getMoveVector();
   const isMoving = (mv.x !== 0 || mv.z !== 0);
   
-  // 自动疾跑：如果摇杆推到底（magnitude > 0.9）或者按住Shift
-  const wantsToSprint = e.input.keys.has('shift') || e.input.isActive('sprint') || (e.input.joystickLeft?.vector.magnitude > 0.9);
+  // 摇杆推到底(magnitude > 0.9) 或者 按住Shift(PC) / 疾跑按键(移动端) 触发疾跑
+  const wantsToSprint = e.input.keys.has('shift') || 
+                        e.input.isActive('sprint') || 
+                        (e.input.joystickLeft && e.input.joystickLeft.vector.magnitude > 0.9);
+  
   let isSprinting = false;
   
   if (isMoving && wantsToSprint && p.stamina > 5) {
     isSprinting = true;
-    // 冲刺每秒消耗 12 点体力
-    p.stamina = Math.max(0, p.stamina - dt * 12); 
+    p.stamina = Math.max(0, p.stamina - dt * 15); // 冲刺每秒消耗体力
   } else {
-    // 走路每秒恢复 5，站定每秒恢复 20（硬核体力管理）
+    // 走路缓慢恢复，站定快速恢复
     const regen = isMoving ? 5 : 20;
     p.stamina = Math.min(p.maxStamina, p.stamina + dt * regen); 
   }
-
-  // =========================================================
-  // 3. 计算移动向量与速度
-  // =========================================================
+  
   const baseSpeed = p.charSpec.speed * (p.speedMul !== undefined ? p.speedMul : 1);
-  // 冲刺速度加成：1.8倍
-  const speed = isSprinting ? baseSpeed * 1.8 : baseSpeed; 
+  const speed = isSprinting ? baseSpeed * 1.8 : baseSpeed; // 冲刺速度加成
 
-  // 根据相机朝向计算实际移动方向（确保 W 永远是向前）
+  // ★ 3. 移动计算（基于相机朝向的 3D 移动）
   const forwardX = Math.sin(e.cameraCtl.yaw);
   const forwardZ = -Math.cos(e.cameraCtl.yaw);
   const rightX = Math.cos(e.cameraCtl.yaw);
@@ -952,31 +946,24 @@ _updatePlayer(dt){
   let moveX = rightX * mv.x + forwardX * -mv.z;
   let moveZ = rightZ * mv.x + forwardZ * -mv.z;
 
-  // 将速度赋予物理刚体
   p.body.velocity.x = moveX * speed;
   p.body.velocity.z = moveZ * speed;
-  
-  // 唤醒休眠的物理体
   if (isMoving) p.body.wake();
 
-  // =========================================================
-  // 4. 跳跃
-  // =========================================================
+  // ★ 4. 跳跃检测
   const jumpPressed = e.input.keys.has(' ') || e.input.isActive('jump');
-  // 简单的地面检测：高度接近地面，且垂直速度向下
   if (jumpPressed && p.body.position.y <= p.body.radius + 0.2 && p.body.velocity.y <= 0.1) {
     p.body.velocity.y = 8.5; 
     p.body.wake();
   }
 
-  // 角色永远面朝相机正前方
+  // ★ 5. 角色朝向始终跟随相机前方
   p.angle = e.cameraCtl.yaw;
 
-  // =========================================================
-  // 5. 技能冷却、换弹、开火
-  // =========================================================
+  // 更新耦合防护状态（耗能/恢复）
   this._updateProtection(dt);
 
+  // 技能冷却
   for (const sk of p.skills) {
     if (!sk.ready) {
       sk.cd -= dt;
@@ -984,6 +971,7 @@ _updatePlayer(dt){
     }
   }
 
+  // ★ 6. 换弹与开火逻辑
   if (p.reloading > 0) {
     p.reloading -= dt;
     if (p.reloading <= 0) this._finishReload();
@@ -995,19 +983,19 @@ _updatePlayer(dt){
     }
   }
 
+  // ★ 7. 其他输入动作检测
   if (e.input.isActive('reload')) this._startReload();
   if (e.input.isActive('switchWeapon') && p.sidearm) this._switchWeapon();
   if (e.input.isActive('skill1')) this._useSkill(0);
   if (e.input.isActive('skill2')) this._useSkill(1);
   if (e.input.isActive('search')) this._trySearchContainer();
 
-  // =========================================================
-  // 6. 边界限制
-  // =========================================================
+  // 边界限制，防止跑出地图
   const half = this.mapSpec.size / 2 - 1;
   p.body.position.x = Math.max(-half, Math.min(half, p.body.position.x));
   p.body.position.z = Math.max(-half, Math.min(half, p.body.position.z));
 }
+
   
 
   _updateProtection(dt){
