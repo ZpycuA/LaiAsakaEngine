@@ -638,6 +638,8 @@ class GameWorld {
       carriedValue: 0,
       limbDamage: 0,
       speedMul: 1,
+      stamina: 100,      // ★ 加上这个
+      maxStamina: 100,   // ★ 加上这个
       armor: {
         shell: { lv: 3, dur: 100, max: 100 },
         visor: { lv: 3, dur: 100, max: 100 },
