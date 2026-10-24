@@ -1087,25 +1087,21 @@ _updatePlayer(dt){
 
   if (isPlayer) owner.fireCd = 60 / def.rpm;
   else owner.fireCd = 60 / def.rpm * (0.9 + Math.random() * 0.4);
-
   if (isPlayer) { weapon.mag--; this.stats.shots++; }
 
   const baseSpread = def.spread || 0.02;
   const acc = isPlayer ? 1.0 : (owner.spec ? owner.spec.acc : 0.5);
   const spread = baseSpread * (isPlayer ? 1 : (1.5 - acc));
-
   const baseEnergy = CombatSystem.kinetic(ammo.massG, ammo.v0);
   const range = (def.range || 50) * 10;
-
-  if (isPlayer && this.engine.profile.get('combat.realisticRecoil', false)) {
-    const rec = def.recoil || 1;
-    this.engine.cameraCtl.shake(0.25 * rec, 0.05);
-  }
 
   const pellets = def.pellets || 1;
   
   if (isPlayer) {
+    // ★ 玩家射击：获取相机的真实位置和朝向，保证绝对指哪打哪
     const cam = this.engine.renderer.camera;
+    const camPos = new THREE.Vector3();
+    cam.getWorldPosition(camPos);
     const dir = new THREE.Vector3();
     cam.getWorldDirection(dir);
     
@@ -1116,15 +1112,17 @@ _updatePlayer(dt){
       const dY = dir.y + spreadY;
       const dZ = dir.z + spreadX;
       const len = Math.hypot(dX, dY, dZ) || 1;
-      this._raycastBullet(owner, dX/len, dY/len, dZ/len, baseEnergy, range, def, ammo, true);
+      // 从相机位置出发
+      this._raycastBullet(owner, camPos.x, camPos.y, camPos.z, dX/len, dY/len, dZ/len, baseEnergy, range, def, ammo, true);
     }
   } else {
+    // 敌人射击：从胸口高度出发
+    const sy = owner.body.position.y + 1.2;
     for (let i = 0; i < pellets; i++) {
       const a = owner.angle + (Math.random() * 2 - 1) * spread;
-      this._raycastBullet(owner, Math.cos(a), 0, Math.sin(a), baseEnergy, range, def, ammo, false);
+      this._raycastBullet(owner, owner.body.position.x, sy, owner.body.position.z, Math.cos(a), 0, Math.sin(a), baseEnergy, range, def, ammo, false);
     }
   }
-
   this._playSFX('shot_' + def.cls, { volume: 0.6 });
 }
 
