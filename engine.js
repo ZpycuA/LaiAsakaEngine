@@ -28,6 +28,7 @@
      [18] Loader（完整 GLTF/Texture/Audio/JSON 实现）
      [19] DevConsole（完整命令/自动补全/历史）
      [20] ModeRegistry
+     [20.5]ProfileSystem（玩法操作难度预设）
      [21] Engine（总装）
      [22] 导出
    ============================================================ */
@@ -2169,6 +2170,147 @@ class ModeRegistry {
   has(id){ return this.modes.has(id); }
   all(){ return Array.from(this.modes.values()); }
   ids(){ return Array.from(this.modes.keys()); }
+}
+
+/* ============================================================
+   [20.5] ProfileSystem · 玩法预设与难度评估
+   ------------------------------------------------------------
+   玩家通过 profile 控制"仿真 ↔ 游戏性"平衡。
+   每个 profile 是一组扁平配置键值对，例如：
+     hud.hpBar: true
+     combat.limbDamage: false
+     skills.enabled: true
+
+   引擎提供：
+     registerProfiles(data)  注册预设表（content.js 调用）
+     setProfile(id)          应用预设
+     set(key, value)         自定义单键
+     get(key, defaultValue)  读取
+     assess()                返回实时难度评分
+     onChange(fn)            配置变化回调
+   ============================================================ */
+class ProfileSystem {
+  constructor(engine){
+    this.engine = engine;
+    this.profiles = new Map();
+    this.current = {};
+    this.currentProfileId = null;
+    this.custom = false;
+    this._listeners = new Set();
+
+    // 辅助项权重（开启 = 游戏变简单）
+    this.auxWeights = {
+      'hud.hpBar': 1.5,
+      'hud.cpBar': 1.0,
+      'hud.ammoCounter': 1.0,
+      'hud.taskList': 0.5,
+      'visual.damageNumbers': 1.5,
+      'visual.hitMarkers': 1.0,
+      'visual.minimap': 2.0,
+      'visual.enemyOutline': 2.5,
+      'visual.extractGuide': 1.5,
+      'skills.enabled': 3.0,
+      'skills.cooldownReduction': 2.0,
+    };
+    // 仿真项权重（开启 = 游戏变难）
+    this.realismWeights = {
+      'combat.limbDamage': 2.0,
+      'combat.armorLayerBreak': 2.0,
+      'combat.bulletDrop': 2.5,
+      'combat.headshotInstantKill': 1.5,
+      'combat.realisticRecoil': 2.0,
+      'combat.realisticReload': 1.0,
+      'combat.friendlyFire': 1.5,
+    };
+  }
+
+  registerProfiles(profilesData){
+    if (!profilesData) return;
+    for (const [id, p] of Object.entries(profilesData)) {
+      this.profiles.set(id, p);
+    }
+  }
+
+  list(){ return Array.from(this.profiles.values()); }
+  has(id){ return this.profiles.has(id); }
+
+  setProfile(id){
+    const p = this.profiles.get(id);
+    if (!p) { console.warn('[Profile] 未找到预设:', id); return false; }
+    this.currentProfileId = id;
+    this.custom = false;
+    this.current = {};
+    this._flatten(p.config || {}, '', this.current);
+    this._notify();
+    return true;
+  }
+
+  set(key, value){
+    this.current[key] = value;
+    this.custom = true;
+    this._notify();
+  }
+
+  get(key, defaultValue){
+    if (key in this.current) return this.current[key];
+    return defaultValue;
+  }
+
+  _flatten(obj, prefix, out){
+    for (const k in obj) {
+      const fullKey = prefix ? prefix + '.' + k : k;
+      const v = obj[k];
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        this._flatten(v, fullKey, out);
+      } else {
+        out[fullKey] = v;
+      }
+    }
+  }
+
+  /* 实时难度评估 */
+  assess(){
+    let auxSum = 0, auxMax = 0;
+    for (const [key, w] of Object.entries(this.auxWeights)) {
+      auxMax += w;
+      if (this.get(key, false) === true) auxSum += w;
+    }
+    let realismSum = 0, realismMax = 0;
+    for (const [key, w] of Object.entries(this.realismWeights)) {
+      realismMax += w;
+      if (this.get(key, false) === true) realismSum += w;
+    }
+    const auxRatio = auxMax > 0 ? auxSum / auxMax : 0;
+    const realismRatio = realismMax > 0 ? realismSum / realismMax : 0;
+    const raw = realismRatio - auxRatio;
+    const score = clamp(0.5 + raw * 0.4, 0.05, 0.95);
+
+    let tier, label, rewardMul;
+    if      (score < 0.20) { tier = 'casual';     label = 'profile.tier.casual';     rewardMul = 0.5; }
+    else if (score < 0.40) { tier = 'normal';     label = 'profile.tier.normal';     rewardMul = 0.75; }
+    else if (score < 0.60) { tier = 'tactical';   label = 'profile.tier.tactical';   rewardMul = 1.0; }
+    else if (score < 0.80) { tier = 'hardcore';   label = 'profile.tier.hardcore';   rewardMul = 1.5; }
+    else                   { tier = 'simulation'; label = 'profile.tier.simulation'; rewardMul = 2.0; }
+
+    return {
+      score: Math.round(score * 100) / 100,
+      tier, label, rewardMul,
+      profileId: this.custom ? 'custom' : this.currentProfileId,
+      auxRatio, realismRatio,
+    };
+  }
+
+  onChange(fn){
+    this._listeners.add(fn);
+    return () => this._listeners.delete(fn);
+  }
+
+  _notify(){
+    const assessment = this.assess();
+    for (const fn of this._listeners) {
+      try { fn(assessment); } catch (e) { console.warn('[Profile] listener err', e); }
+    }
+  }
 }
 
 /* ============================================================
