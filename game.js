@@ -1957,64 +1957,79 @@ export class GameApp {
     }
     return ok;
   }
-  _bindCameraControls() {
-    if (this._camBound) return;
-    this._camBound = true;
-    const canvas = this.engine.renderer.canvas;
-    const e = this.engine;
-    let dragId = null;
-    let lastX = 0, lastY = 0;
+ _bindCameraControls() {
+  if (this._camBound) return;
+  this._camBound = true;
+  const canvas = this.engine.renderer.canvas;
+  const e = this.engine;
+  
+  let dragId = null;
+  let lastX = 0, lastY = 0;
 
-    // PC 端鼠标拖拽
-    canvas.addEventListener('pointerdown', (ev) => {
-      if (ev.pointerType === 'mouse') {
-        dragId = 'mouse';
-        lastX = ev.clientX; lastY = ev.clientY;
-      }
-    });
+  // PC端鼠标
+  canvas.addEventListener('mousedown', (ev) => {
+    dragId = 'mouse';
+    lastX = ev.clientX; lastY = ev.clientY;
+  });
+  window.addEventListener('mousemove', (ev) => {
+    if (dragId === 'mouse') {
+      const dx = ev.clientX - lastX;
+      const dy = ev.clientY - lastY;
+      lastX = ev.clientX; lastY = ev.clientY;
+      e.cameraCtl.rotate(dx, dy);
+    }
+  });
+  window.addEventListener('mouseup', () => { dragId = null; });
 
-    window.addEventListener('pointermove', (ev) => {
-      // PC 端
-      if (dragId === 'mouse' && ev.pointerType === 'mouse') {
-        const dx = ev.clientX - lastX;
-        const dy = ev.clientY - lastY;
-        lastX = ev.clientX; lastY = ev.clientY;
-        e.cameraCtl.rotate(dx, dy);
-      }
-      // 移动端右半屏拖拽视角（但不包括右侧按钮区域的点击）
-      if (ev.pointerType === 'touch' && ev.clientX > window.innerWidth * 0.45) {
-        const target = document.elementFromPoint(ev.clientX, ev.clientY);
-        // 如果摸到了按钮，不转视角
-        if (target && target.closest('#mobile-controls')) return;
-        
-        if (dragId === ev.pointerId) {
-          const dx = ev.clientX - lastX;
-          const dy = ev.clientY - lastY;
-          lastX = ev.clientX; lastY = ev.clientY;
-          // 乘以 0.8 降低翻转速度，避免 180 度瞬间闪屏
-          e.cameraCtl.rotate(dx * 0.8, dy * 0.8);
+  // 移动端原生 Touch（严格区分左右）
+  canvas.addEventListener('touchstart', (ev) => {
+    for (let i = 0; i < ev.changedTouches.length; i++) {
+      const t = ev.changedTouches[i];
+      if (t.clientX < window.innerWidth * 0.45) {
+        // 左手：生成摇杆
+        e.input.startLeftStick(t.clientX, t.clientY, t.identifier);
+      } else {
+        // 右手：接管视角，但如果摸到了按钮就不转视角
+        const el = document.elementFromPoint(t.clientX, t.clientY);
+        if (el && el.closest('#mobile-controls button') === null && el.closest('#mobile-controls .mobile-btn') === null) {
+          if (dragId === null) {
+            dragId = t.identifier;
+            lastX = t.clientX; lastY = t.clientY;
+          }
         }
       }
-    });
+    }
+  }, { passive: true });
 
-    canvas.addEventListener('pointerdown', (ev) => {
-      if (ev.pointerType === 'touch' && ev.clientX > window.innerWidth * 0.45) {
-        const target = document.elementFromPoint(ev.clientX, ev.clientY);
-        if (target && target.closest('#mobile-controls')) return; // 点按钮不接管视角
-        if (dragId === null) {
-          dragId = ev.pointerId;
-          lastX = ev.clientX; lastY = ev.clientY;
-        }
+  canvas.addEventListener('touchmove', (ev) => {
+    for (let i = 0; i < ev.changedTouches.length; i++) {
+      const t = ev.changedTouches[i];
+      if (e.input.touch.left && e.input.touch.left.id === t.identifier) {
+        e.input.moveLeftStick(t.clientX, t.clientY);
+      } else if (dragId === t.identifier) {
+        const dx = t.clientX - lastX;
+        const dy = t.clientY - lastY;
+        lastX = t.clientX; lastY = t.clientY;
+        e.cameraCtl.rotate(dx * 1.5, dy * 1.5); // 增大移动端视角灵敏度
       }
-    });
+    }
+  }, { passive: true });
 
-    window.addEventListener('pointerup', (ev) => {
-      if (ev.pointerType === 'mouse' || ev.pointerId === dragId) {
+  const endTouch = (ev) => {
+    for (let i = 0; i < ev.changedTouches.length; i++) {
+      const t = ev.changedTouches[i];
+      if (e.input.touch.left && e.input.touch.left.id === t.identifier) {
+        e.input.endLeftStick();
+      } else if (dragId === t.identifier) {
         dragId = null;
       }
-    });
-    window.addEventListener('contextmenu', e => e.preventDefault());
-  }
+    }
+  };
+  canvas.addEventListener('touchend', endTouch, { passive: true });
+  canvas.addEventListener('touchcancel', endTouch, { passive: true });
+  
+  window.addEventListener('contextmenu', e => e.preventDefault());
+}
 
  _renderCustomSettings(){
   const el = document.getElementById('custom-settings');
