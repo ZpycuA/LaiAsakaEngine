@@ -1951,32 +1951,64 @@ export class GameApp {
     }
     return ok;
   }
-    _bindCameraControls() {
-  if (this._camBound) return;
-  this._camBound = true;
-  let isDragging = false;
-  let lastX = 0, lastY = 0;
-  const canvas = this.engine.renderer.canvas;
+  _bindCameraControls() {
+    if (this._camBound) return;
+    this._camBound = true;
+    const canvas = this.engine.renderer.canvas;
+    const e = this.engine;
+    let dragId = null;
+    let lastX = 0, lastY = 0;
 
-  canvas.addEventListener('pointerdown', (e) => {
-    // 左键和右键都可以拖拽
-    isDragging = true;
-    lastX = e.clientX; lastY = e.clientY;
-  });
+    // PC 端鼠标拖拽
+    canvas.addEventListener('pointerdown', (ev) => {
+      if (ev.pointerType === 'mouse') {
+        dragId = 'mouse';
+        lastX = ev.clientX; lastY = ev.clientY;
+      }
+    });
 
-  window.addEventListener('pointermove', (e) => {
-    if (!isDragging) return;
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
-    lastX = e.clientX; lastY = e.clientY;
-    if (this.engine.cameraCtl) this.engine.cameraCtl.rotate(dx, dy);
-  });
+    window.addEventListener('pointermove', (ev) => {
+      // PC 端
+      if (dragId === 'mouse' && ev.pointerType === 'mouse') {
+        const dx = ev.clientX - lastX;
+        const dy = ev.clientY - lastY;
+        lastX = ev.clientX; lastY = ev.clientY;
+        e.cameraCtl.rotate(dx, dy);
+      }
+      // 移动端右半屏拖拽视角（但不包括右侧按钮区域的点击）
+      if (ev.pointerType === 'touch' && ev.clientX > window.innerWidth * 0.45) {
+        const target = document.elementFromPoint(ev.clientX, ev.clientY);
+        // 如果摸到了按钮，不转视角
+        if (target && target.closest('#mobile-controls')) return;
+        
+        if (dragId === ev.pointerId) {
+          const dx = ev.clientX - lastX;
+          const dy = ev.clientY - lastY;
+          lastX = ev.clientX; lastY = ev.clientY;
+          // 乘以 0.8 降低翻转速度，避免 180 度瞬间闪屏
+          e.cameraCtl.rotate(dx * 0.8, dy * 0.8);
+        }
+      }
+    });
 
-  window.addEventListener('pointerup', () => { 
-    isDragging = false; 
-  });
-  window.addEventListener('contextmenu', e => e.preventDefault());
-}
+    canvas.addEventListener('pointerdown', (ev) => {
+      if (ev.pointerType === 'touch' && ev.clientX > window.innerWidth * 0.45) {
+        const target = document.elementFromPoint(ev.clientX, ev.clientY);
+        if (target && target.closest('#mobile-controls')) return; // 点按钮不接管视角
+        if (dragId === null) {
+          dragId = ev.pointerId;
+          lastX = ev.clientX; lastY = ev.clientY;
+        }
+      }
+    });
+
+    window.addEventListener('pointerup', (ev) => {
+      if (ev.pointerType === 'mouse' || ev.pointerId === dragId) {
+        dragId = null;
+      }
+    });
+    window.addEventListener('contextmenu', e => e.preventDefault());
+  }
 
  _renderCustomSettings(){
   const el = document.getElementById('custom-settings');
