@@ -1506,11 +1506,25 @@ _syncMeshes(){
     p.mesh.rotation.y = -p.angle;
   }
   for (const e of this.enemies) {
-    if (!e.alive || !e.mesh) continue;
+    if (!e.mesh) continue;
+    
+    // 如果敌人死了，强制重置一次材质并隐藏
+    if (!e.alive) {
+      e.mesh.visible = false;
+      e.mesh.traverse(obj => {
+        if (obj.isMesh && obj.material && obj.material.emissive) {
+          obj.material.emissive.setHex(0x000000);
+          obj.material.emissiveIntensity = 0;
+        }
+      });
+      continue;
+    }
+
     e.mesh.position.set(e.body.position.x, 0, e.body.position.z);
     e.mesh.rotation.y = -e.angle;
     
     if (e.hitFlash > 0) {
+      e.hitFlash -= 0.016; // 在渲染循环里兜底扣减
       e.mesh.traverse(obj => {
         if (obj.isMesh && obj.material && obj.material.emissive) {
           obj.material.emissive.setHex(0xffffff);
