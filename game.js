@@ -1635,37 +1635,37 @@ export class GameApp {
   }
 
   _bindGlobalHandlers(){
-    const e = this.engine;
+  const e = this.engine;
 
-    document.getElementById('btn-start').addEventListener('click', () => this.startMatch('normal'));
-    document.getElementById('btn-train').addEventListener('click', () => this.startMatch('training'));
-    document.getElementById('pause-btn').addEventListener('click', () => this._togglePause());
-    document.getElementById('btn-resume').addEventListener('click', () => this._togglePause(false));
-    document.getElementById('btn-quit').addEventListener('click', () => this._quitToMenu());
+  // 这里不再绑定开始/训练按钮，因为 index.html 已经绑定了。
+  // 只绑定剩下的。
+  document.getElementById('pause-btn')?.addEventListener('click', () => this._togglePause());
+  document.getElementById('btn-resume')?.addEventListener('click', () => this._togglePause(false));
+  document.getElementById('btn-quit')?.addEventListener('click', () => this._quitToMenu());
 
-    document.getElementById('btn-again').addEventListener('click', () => {
-      document.getElementById('result-screen').classList.remove('on');
-      this.startMatch(this._lastMatchKind);
-    });
-    document.getElementById('btn-menu').addEventListener('click', () => {
-      document.getElementById('result-screen').classList.remove('on');
-      this._quitToMenu();
-    });
+  document.getElementById('btn-again')?.addEventListener('click', () => {
+    document.getElementById('result-screen')?.classList.remove('on');
+    this.startMatch(this._lastMatchKind);
+  });
+  document.getElementById('btn-menu')?.addEventListener('click', () => {
+    document.getElementById('result-screen')?.classList.remove('on');
+    this._quitToMenu();
+  });
 
-    window.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Escape' && this.world && this.world.running) {
-        ev.preventDefault();
-        this._togglePause();
-      }
-    });
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && this.world && this.world.running) {
+      ev.preventDefault();
+      this._togglePause();
+    }
+  });
 
-    e.i18n.onLanguageChange(() => {
-      if (this._menuReady) {
-        this._setupMenu();
-        if (this.world) this.world.hud.update();
-      }
-    });
-  }
+  e.i18n.onLanguageChange(() => {
+    if (this._menuReady) {
+      this._setupMenu();
+      if (this.world) this.world.hud.update();
+    }
+  });
+}
 
   _registerDevCommands(){
     const dc = this.engine.devConsole;
