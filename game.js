@@ -2253,6 +2253,11 @@ if (gyroSens) {
   // 保险起见，直接把所有悬浮层清理掉
   document.getElementById('result-screen')?.classList.remove('on');
   document.getElementById('pause-screen')?.classList.remove('on');
+ const _again = document.getElementById('btn-again');
+if (_again) _again.style.display = '';
+const _reportBtn = document.getElementById('btn-view-report');
+if (_reportBtn) _reportBtn.remove();
+hideCombatReport();
   
   const crosshair = document.getElementById('crosshair');
   if (crosshair) crosshair.style.display = 'block';
