@@ -1808,32 +1808,35 @@ export class GameApp {
   }
 }
 
-      _onMatchEnd(success, stats){
-    try {
-      const e = this.engine;
-      const save = e.save;
-      const assessment = e.profile.assess();
+    _onMatchEnd(success, stats){
+  try {
+    const e = this.engine;
+    const save = e.save;
+    const assessment = e.profile.assess();
 
-      save.data.stats = save.data.stats || { runs: 0, extracts: 0, deaths: 0, kills: 0 };
-      save.data.stats.runs++;
-      if (success) save.data.stats.extracts++;
-      else save.data.stats.deaths++;
-      save.data.stats.kills = (save.data.stats.kills || 0) + (stats.kills || 0);
+    save.data.stats = save.data.stats || { runs: 0, extracts: 0, deaths: 0, kills: 0 };
+    save.data.stats.runs++;
+    if (success) save.data.stats.extracts++;
+    else save.data.stats.deaths++;
+    save.data.stats.kills = (save.data.stats.kills || 0) + (stats.kills || 0);
 
-      let baseReward = 0;
-      if (success) baseReward += 500;
-      baseReward += (stats.kills || 0) * 30;
-      baseReward += (stats.carriedValue || 0);
-      const finalReward = Math.round(baseReward * assessment.rewardMul);
+    let baseReward = 0;
+    if (success) baseReward += 500;
+    baseReward += (stats.kills || 0) * 30;
+    baseReward += (stats.carriedValue || 0);
+    const finalReward = Math.round(baseReward * assessment.rewardMul);
 
-      save.data.credits = (save.data.credits || 0) + finalReward;
-      save.save();
+    save.data.credits = (save.data.credits || 0) + finalReward;
+    save.save();
 
-      const title = document.getElementById('result-title');
-      const statsEl = document.getElementById('result-stats');
+    const title = document.getElementById('result-title');
+    const statsEl = document.getElementById('result-stats');
+    if (title) {
       title.textContent = e.i18n.t(success ? 'ui.result.extract_success' : 'ui.result.operation_failed');
       title.className = success ? 'success' : 'fail';
+    }
 
+    if (statsEl) {
       const statLines = [
         `击杀：<b>${stats.kills || 0}</b>　命中率：<b>${stats.accuracy || 0}%</b>`,
         `造成伤害：<b>${stats.dealt || 0}</b>　承受伤害：<b>${stats.taken || 0}</b>`,
@@ -1846,17 +1849,21 @@ export class GameApp {
         </div>`,
       ];
       statsEl.innerHTML = statLines.join('<br>');
-
-      document.getElementById('result-screen').classList.add('on');
-      document.getElementById('pause-screen').classList.remove('on');
-      document.getElementById('mobile-controls').style.display = 'none';
-
-      e.bus.emit('matchEnded', { success, stats, reward: finalReward, assessment });
-    } catch (err) {
-      console.error('[GameApp] 结算出错:', err);
-      document.getElementById('result-screen').classList.add('on');
     }
+
+    document.getElementById('result-screen')?.classList.add('on');
+    document.getElementById('pause-screen')?.classList.remove('on');
+    
+    // ★ 核心修复 2：空指针保护
+    const mob = document.getElementById('mobile-controls');
+    if (mob) mob.style.display = 'none';
+
+    e.bus.emit('matchEnded', { success, stats, reward: finalReward, assessment });
+  } catch (err) {
+    console.error('[GameApp] 结算出错:', err);
+    document.getElementById('result-screen')?.classList.add('on');
   }
+}
 
   _togglePause(force){
     if (!this.world || !this.world.running) return;
