@@ -1213,20 +1213,18 @@ class CameraController {
   constructor(camera, opts){
     this.camera = camera;
     this.yaw = 0;
-    this.pitch = 0.2; 
-    this.distance = 6; 
-    this.followSpeed = opts.followSpeed || 0.2;
-    this.target = { x: 0, y: 0, z: 0 };
+    this.pitch = 0;
+    this.target = { x: 0, y: 1.6, z: 0 }; // 眼睛高度
     this.shakeIntensity = 0;
     this.shakeTimer = 0;
-    this.shakeOffset = { x: 0, z: 0 };
+    this.shakeOffset = { x: 0, y: 0, z: 0 };
   }
   
   follow(x, z){ this.target.x = x; this.target.z = z; }
   
   rotate(dx, dy) {
-    this.yaw -= dx * 0.005;
-    this.pitch = clamp(this.pitch - dy * 0.005, -0.5, 1.2);
+    this.yaw -= dx * 0.003;
+    this.pitch = clamp(this.pitch - dy * 0.003, -Math.PI/2 + 0.1, Math.PI/2 - 0.1);
   }
 
   shake(amount, duration){
@@ -1238,22 +1236,21 @@ class CameraController {
     if (this.shakeTimer > 0) {
       const i = this.shakeIntensity * (this.shakeTimer / 0.2);
       this.shakeOffset.x = (Math.random() * 2 - 1) * i;
+      this.shakeOffset.y = (Math.random() * 2 - 1) * i;
       this.shakeOffset.z = (Math.random() * 2 - 1) * i;
       this.shakeTimer -= dt;
-      if (this.shakeTimer <= 0) { this.shakeOffset.x = 0; this.shakeOffset.z = 0; }
+      if (this.shakeTimer <= 0) { this.shakeOffset.x = 0; this.shakeOffset.y = 0; this.shakeOffset.z = 0; }
     }
 
-    const ox = this.target.x + this.shakeOffset.x - Math.sin(this.yaw) * Math.cos(this.pitch) * this.distance;
-    const oz = this.target.z + this.shakeOffset.z + Math.cos(this.yaw) * Math.cos(this.pitch) * this.distance;
-    const oy = this.target.y + 2.0 + Math.sin(this.pitch) * this.distance;
+    const ox = this.target.x + this.shakeOffset.x;
+    const oy = this.target.y + this.shakeOffset.y;
+    const oz = this.target.z + this.shakeOffset.z;
 
-    this.camera.position.x = lerp(this.camera.position.x, ox, this.followSpeed);
-    this.camera.position.y = lerp(this.camera.position.y, oy, this.followSpeed);
-    this.camera.position.z = lerp(this.camera.position.z, oz, this.followSpeed);
+    this.camera.position.set(ox, oy, oz);
     
-    const lookX = this.target.x + Math.sin(this.yaw) * 2;
-    const lookY = this.target.y + 1.5;
-    const lookZ = this.target.z - Math.cos(this.yaw) * 2;
+    const lookX = ox + Math.sin(this.yaw) * Math.cos(this.pitch);
+    const lookY = oy + Math.sin(this.pitch);
+    const lookZ = oz - Math.cos(this.yaw) * Math.cos(this.pitch);
     this.camera.lookAt(lookX, lookY, lookZ);
   }
 }
