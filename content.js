@@ -230,6 +230,73 @@ export function registerDefaultContent(engine) {
   };
   c.registerAll('tasks', TASKS);
 
+
+    /* ==========================================================
+     8.5. 玩法预设（Profile）
+     ----------------------------------------------------------
+     控制"仿真 ↔ 游戏性"平衡。玩家可在主菜单切换。
+     每个配置项含义见 engine.js 的 ProfileSystem.auxWeights / realismWeights。
+     ========================================================== */
+  const PROFILES = {
+    hardcore: {
+      name: 'profile.hardcore.name',
+      desc: 'profile.hardcore.desc',
+      config: {
+        hud: { hpBar: false, cpBar: false, ammoCounter: false, taskList: true },
+        visual: { damageNumbers: false, hitMarkers: false, minimap: false, enemyOutline: false, extractGuide: false },
+        combat: {
+          limbDamage: true, armorLayerBreak: true, bulletDrop: true,
+          headshotInstantKill: true, realisticRecoil: true, realisticReload: true,
+          friendlyFire: true,
+        },
+        skills: { enabled: false, cooldownReduction: 1.0 },
+      },
+    },
+    tactical: {
+      name: 'profile.tactical.name',
+      desc: 'profile.tactical.desc',
+      config: {
+        hud: { hpBar: true, cpBar: true, ammoCounter: true, taskList: true },
+        visual: { damageNumbers: true, hitMarkers: true, minimap: true, enemyOutline: false, extractGuide: true },
+        combat: {
+          limbDamage: true, armorLayerBreak: true, bulletDrop: false,
+          headshotInstantKill: true, realisticRecoil: true, realisticReload: true,
+          friendlyFire: false,
+        },
+        skills: { enabled: true, cooldownReduction: 1.0 },
+      },
+    },
+    arcade: {
+      name: 'profile.arcade.name',
+      desc: 'profile.arcade.desc',
+      config: {
+        hud: { hpBar: true, cpBar: true, ammoCounter: true, taskList: true },
+        visual: { damageNumbers: true, hitMarkers: true, minimap: true, enemyOutline: true, extractGuide: true },
+        combat: {
+          limbDamage: false, armorLayerBreak: false, bulletDrop: false,
+          headshotInstantKill: false, realisticRecoil: false, realisticReload: false,
+          friendlyFire: false,
+        },
+        skills: { enabled: true, cooldownReduction: 0.7 },
+      },
+    },
+    apex: {
+      name: 'profile.apex.name',
+      desc: 'profile.apex.desc',
+      config: {
+        hud: { hpBar: true, cpBar: true, ammoCounter: true, taskList: true },
+        visual: { damageNumbers: true, hitMarkers: true, minimap: true, enemyOutline: true, extractGuide: true },
+        combat: {
+          limbDamage: false, armorLayerBreak: false, bulletDrop: false,
+          headshotInstantKill: false, realisticRecoil: false, realisticReload: false,
+          friendlyFire: false,
+        },
+        skills: { enabled: true, cooldownReduction: 0.5 },
+      },
+    },
+  };
+  c.registerAll('profiles', PROFILES);
+
   /* ==========================================================
      9. 外部覆盖（window.LAIASAKA_CONTENT）
      ----------------------------------------------------------
@@ -242,6 +309,14 @@ export function registerDefaultContent(engine) {
       console.log('[Content] 已应用外部内容覆盖');
     } catch (e) {
       console.warn('[Content] 外部内容加载失败:', e);
+    }
+  }
+
+    /* --- 注册到 ProfileSystem --- */
+  if (engine.profile) {
+    engine.profile.registerProfiles(PROFILES);
+    if (!engine.profile.currentProfileId) {
+      engine.profile.setProfile('tactical');   // 默认平衡
     }
   }
 
