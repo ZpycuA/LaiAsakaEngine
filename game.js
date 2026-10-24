@@ -1352,12 +1352,12 @@ _raycastBullet(owner, ox, oy, oz, dirX, dirY, dirZ, baseEnergy, range, weaponDef
   if (coup.cost > 0) player.coupling = Math.max(0, player.coupling - coup.cost);
   let remaining = coup.remaining;
 
-  // 记录受击方向（相对于相机朝向）
-  if (this.world) {
-  // 假设敌人子弹是从某个方向来的
-  const angle = Math.atan2(ox - player.body.position.x, oz - player.body.position.z); 
-  this.world.lastHitDir = angle - this.engine.cameraCtl.yaw;
-}
+  // 记录受击方向
+  const srcX = (pen !== undefined && arguments[3] !== undefined) ? arguments[3] : player.body.position.x + 1;
+const srcZ = (arguments[4] !== undefined) ? arguments[4] : player.body.position.z + 1;
+const ang = Math.atan2(srcZ - player.body.position.z, srcX - player.body.position.x);
+this.lastHitDir = ang - this.engine.cameraCtl.yaw;
+this.lastHitTime = this.time;
     
   const plate = CombatSystem.applyArmor(player.armor.plate, remaining, pen);
   remaining = plate.remaining;
