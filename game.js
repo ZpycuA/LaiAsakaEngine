@@ -2037,14 +2037,22 @@ export class GameApp {
 }
 
   _syncCustomSettingsUI(){
-    const el = document.getElementById('custom-settings');
-    if (!el) return;
-    el.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-      const key = cb.dataset.key;
-      const val = this.engine.profile.get(key, false);
-      cb.checked = val === true;
-    });
-  }
+  const el = document.getElementById('custom-settings');
+  if (!el) return;
+  
+  el.querySelectorAll('input').forEach(input => {
+    const key = input.dataset.key;
+    const val = this.engine.profile.get(key, false);
+    if (input.type === 'checkbox') {
+      input.checked = val === true;
+    } else if (input.type === 'range') {
+      input.value = val !== false ? val : 1.0;
+      if (key === 'input.sensitivity') {
+        this.engine.cameraCtl.sensitivity = parseFloat(input.value);
+      }
+    }
+  });
+}
 
      _setupMobileControls(isMobile) {
     let container = document.getElementById('mobile-controls');
