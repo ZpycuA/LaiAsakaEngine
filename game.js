@@ -1980,4 +1980,63 @@ export class GameApp {
       cb.checked = val === true;
     });
   }
+
+     _setupMobileControls(isMobile) {
+    let container = document.getElementById('mobile-controls');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'mobile-controls';
+      container.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:35;display:none';
+      document.getElementById('game-screen').appendChild(container);
+    }
+
+    if (!isMobile) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = 'block';
+
+    // 如果已经生成过，直接返回（避免重复生成）
+    if (container.children.length > 0) return;
+
+    // 可维护的键位表配置
+    const layout = [
+      { id: 'fire', label: '开火', right: '20px', bottom: '80px', size: 80, color: 'rgba(255,80,80,.3)', border: 'rgba(255,100,100,.6)' },
+      { id: 'jump', label: '跳跃', right: '120px', bottom: '40px', size: 60, color: 'rgba(80,255,150,.3)', border: 'rgba(100,255,150,.6)' },
+      { id: 'reload', label: '换弹', right: '20px', bottom: '180px', size: 60, color: 'rgba(200,200,200,.3)', border: 'rgba(255,255,255,.6)' }
+    ];
+
+    for (const btn of layout) {
+      const el = document.createElement('div');
+      el.style.cssText = `
+        position:absolute;right:${btn.right};bottom:${btn.bottom};
+        width:${btn.size}px;height:${btn.size}px;border-radius:50%;
+        background:${btn.color};border:2px solid ${btn.border};
+        color:#fff;display:flex;align-items:center;justify-content:center;
+        pointer-events:auto;font-weight:800;font-size:14px;
+        user-select:none;-webkit-user-select:none;touch-action:none;
+        box-shadow:0 4px 12px rgba(0,0,0,.4);
+      `;
+      el.textContent = btn.label;
+      
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        this.engine.input.setActionState(btn.id, true);
+        el.style.transform = 'scale(0.9)';
+      });
+      
+      const release = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        this.engine.input.setActionState(btn.id, false);
+        el.style.transform = 'scale(1)';
+      };
+      
+      el.addEventListener('pointerup', release);
+      el.addEventListener('pointercancel', release);
+      el.addEventListener('pointerleave', release);
+      
+      container.appendChild(el);
+    }
+     }
 }
