@@ -1100,46 +1100,46 @@ _raycastBullet(owner, dirX, dirY, dirZ, baseEnergy, range, weaponDef, ammoDef, i
   if (enemy.hp <= 0 && enemy.alive) this._killEnemy(enemy);
 }
 
-  _damagePlayer(player, energy, pen){
-    if (!player.alive) return;
+ _damagePlayer(player, energy, pen){
+  if (!player.alive) return;
 
-    const profile = this.engine.profile;
-    const coup = CombatSystem.applyCoupling(player, energy, 'ballistic');
-    if (coup.cost > 0) player.coupling = Math.max(0, player.coupling - coup.cost);
-    let remaining = coup.remaining;
+  const profile = this.engine.profile;
+  const coup = CombatSystem.applyCoupling(player, energy, 'ballistic');
+  if (coup.cost > 0) player.coupling = Math.max(0, player.coupling - coup.cost);
+  let remaining = coup.remaining;
 
-    const plate = CombatSystem.applyArmor(player.armor.plate, remaining, pen);
-    remaining = plate.remaining;
-    const fiber = CombatSystem.applyArmor(player.armor.fiber, remaining, pen);
-    remaining = fiber.remaining;
+  const plate = CombatSystem.applyArmor(player.armor.plate, remaining, pen);
+  remaining = plate.remaining;
+  const fiber = CombatSystem.applyArmor(player.armor.fiber, remaining, pen);
+  remaining = fiber.remaining;
 
-    const isHead = Math.random() < 0.05;
-    if (isHead) remaining *= COMBAT.HEAD_MULT;
+  const isHead = Math.random() < 0.05;
+  if (isHead) remaining *= COMBAT.HEAD_MULT;
 
-    // ★ [Profile] 爆头即死（对玩家同样生效）
-    if (isHead && profile.get('combat.headshotInstantKill', false)) {
-      remaining = player.maxHp * COMBAT.BODY_COEFF_HUMAN;
-    }
-
-    const dmg = CombatSystem.energyToHP(remaining, player.charSpec.prazer);
-    player.hp -= dmg;
-    player.taken += dmg;
-
-    // ★ [Profile] 四肢伤害
-    if (profile.get('combat.limbDamage', false)) {
-      player.limbDamage = (player.limbDamage || 0) + 1;
-      if (player.limbDamage >= 4) {
-        player.speedMul = Math.max(0.4, 1 - (player.limbDamage - 3) * 0.15);
-      }
-    }
-
-    this._spawnDamageNumber(player.body.position.x, player.body.position.z, Math.round(dmg), 'player');
-    this._hurtFX();
-    this.engine.cameraCtl.shake(0.4, 0.15);
-    this._playSFX('hurt', { volume: 0.5 });
-
-    if (player.hp <= 0 && player.alive) this._playerDown();
+  // ★ 修复：爆头即死时，伤害刚好等于玩家当前血量，不再无限溢出
+  if (isHead && profile.get('combat.headshotInstantKill', false)) {
+    remaining = player.hp * COMBAT.BODY_COEFF_HUMAN;
   }
+
+  const dmg = CombatSystem.energyToHP(remaining, player.charSpec.prazer);
+  player.hp -= dmg;
+  player.taken += dmg;
+
+  // ★ [Profile] 四肢伤害
+  if (profile.get('combat.limbDamage', false)) {
+    player.limbDamage = (player.limbDamage || 0) + 1;
+    if (player.limbDamage >= 4) {
+      player.speedMul = Math.max(0.4, 1 - (player.limbDamage - 3) * 0.15);
+    }
+  }
+
+  this._spawnDamageNumber(player.body.position.x, player.body.position.z, Math.round(dmg), 'player');
+  this._hurtFX();
+  this.engine.cameraCtl.shake(0.4, 0.15);
+  this._playSFX('hurt', { volume: 0.5 });
+
+  if (player.hp <= 0 && player.alive) this._playerDown();
+}
 
   _killEnemy(enemy){
     enemy.alive = false;
