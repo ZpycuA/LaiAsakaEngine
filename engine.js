@@ -1391,52 +1391,54 @@ class PhysicsWorld {
     }
   }
   _integrate(dt){
-  const g = this.gravity;
-  for (const b of this.dynamicBodies) {
-    if (b.isStatic || !b.alive) continue;
-    
-    // ★ 修复：如果有了速度，必须自动唤醒，防止卡在休眠状态
-    if (b.sleeping) {
-      if (b.velocity.x !== 0 || b.velocity.y !== 0 || b.velocity.z !== 0 || b.force.x !== 0 || b.force.z !== 0) {
-        b.wake();
-      } else {
-        continue;
-      }
-    }
-
-    if (this.enableSleep && b.allowSleep) {
-      const speed2 = b.velocity.x ** 2 + b.velocity.z ** 2;
-      if (speed2 < b.sleepThreshold ** 2 && !b.sleeping) {
-        b.sleepTimer += dt;
-        if (b.sleepTimer > b.sleepTime) {
-          b.sleeping = true;
-          b.velocity.x = 0;
-          b.velocity.z = 0;
+    const g = this.gravity;
+    for (const b of this.dynamicBodies) {
+      if (b.isStatic || !b.alive) continue;
+      
+      if (b.sleeping) {
+        if (b.velocity.x !== 0 || b.velocity.y !== 0 || b.velocity.z !== 0 || b.force.x !== 0 || b.force.z !== 0) {
+          b.wake();
+        } else {
+          continue;
         }
-      } else {
-        b.sleepTimer = 0;
       }
+
+      if (this.enableSleep && b.allowSleep) {
+        const speed2 = b.velocity.x ** 2 + b.velocity.z ** 2;
+        if (speed2 < b.sleepThreshold ** 2 && !b.sleeping) {
+          b.sleepTimer += dt;
+          if (b.sleepTimer > b.sleepTime) {
+            b.sleeping = true;
+            b.velocity.x = 0;
+            b.velocity.z = 0;
+          }
+        } else {
+          b.sleepTimer = 0;
+        }
+      }
+      
+      if (!b.ignoreGravity) {
+        b.velocity.x += (g.x + b.force.x * b.invMass) * dt;
+        b.velocity.y += (g.y + b.force.y * b.invMass) * dt;
+        b.velocity.z += (g.z + b.force.z * b.invMass) * dt;
+      } else {
+        b.velocity.x += b.force.x * b.invMass * dt;
+        b.velocity.z += b.force.z * b.invMass * dt;
+      }
+      
+      if (b.friction > 0) {
+        const f = Math.max(0, 1 - b.friction * dt);
+        b.velocity.x *= f;
+        b.velocity.z *= f;
+      }
+      
+      b.position.x += b.velocity.x * dt;
+      b.position.y += b.velocity.y * dt;
+      b.position.z += b.velocity.z * dt;
+      
+      b.force.x = 0; b.force.y = 0; b.force.z = 0;
     }
-    
-    if (!b.ignoreGravity) {
-      b.velocity.x += (g.x + b.force.x * b.invMass) * dt;
-      b.velocity.y += (g.y + b.force.y * b.invMass) * dt;
-      b.velocity.z += (g.z + b.force.z * b.invMass) * dt;
-    } else {
-      b.velocity.x += b.force.x * b.invMass * dt;
-      b.velocity.z += b.force.z * b.invMass * dt;
-    }
-    if (b.friction > 0) {
-      const f = Math.max(0, 1 - b.friction * dt);
-      b.velocity.x *= f;
-      b.velocity.z *= f;
-    }
-    b.position.x += b.velocity.x * dt;
-    b.position.y += b.velocity.y * dt;
-    b.position.z += b.velocity.z * dt;
-    b.force.x = 0; b.force.y = 0; b.force.z = 0;
   }
-}
   _canCollide(a, b){
     if ((a.mask & b.layer) === 0) return false;
     if ((b.mask & a.layer) === 0) return false;
@@ -1445,7 +1447,7 @@ class PhysicsWorld {
   _solveCollisions(){
     this.hash.clear();
     for (const b of this.dynamicBodies) if (b.alive && !b.sleeping) this.hash.insert(b);
-    // 动态-动态
+    
     for (const a of this.dynamicBodies) {
       if (!a.alive || a.isStatic || a.sleeping) continue;
       const neighbors = this.hash.queryCircle(a.position.x, a.position.z, a.radius * 2);
@@ -1455,7 +1457,6 @@ class PhysicsWorld {
         this._resolveCircleCircle(a, b);
       }
     }
-    // 动态-静态
     for (const a of this.dynamicBodies) {
       if (!a.alive || a.isStatic || a.sleeping) continue;
       for (const s of this.staticBodies) {
@@ -1465,7 +1466,7 @@ class PhysicsWorld {
         else this._resolveCircleCircle(a, s);
       }
     }
-    // 地面
+    
     for (const a of this.dynamicBodies) {
       if (!a.alive || a.isStatic) continue;
       const floor = a.radius;
@@ -1505,9 +1506,6 @@ class PhysicsWorld {
     a.velocity.z -= j * nz * invA;
     b.velocity.x += j * nx * invB;
     b.velocity.z += j * nz * invB;
-    this._contactEvents.push({
-      a, b, normal: { x: nx, z: nz }, depth: overlap, impulse: j,
-    });
     return true;
   }
   _resolveCircleAABB(c, box){
@@ -1543,9 +1541,6 @@ class PhysicsWorld {
       c.velocity.x -= (1 + e) * vn * nx;
       c.velocity.z -= (1 + e) * vn * nz;
     }
-    this._contactEvents.push({
-      a: c, b: box, normal: { x: nx, z: nz }, depth: overlap, impulse: 0,
-    });
     return true;
   }
   _postStep(){
@@ -1558,12 +1553,6 @@ class PhysicsWorld {
       }
     }
   }
-  // 检查某个点下方是否有地面
-  isGrounded(x, y, z, radius) {
-  const hit = this.raycast(x, y, z, 0, -1, 0, radius + 0.2, b => b.isStatic || b.userData?.type === 'obstacle');
-  return !!hit;
-}
-  /* ---- 射线检测 ---- */
   raycast(ox, oy, oz, dx, dy, dz, maxDist, filter){
     const len = Math.hypot(dx, dz) || 1;
     const nx = dx / len, nz = dz / len;
@@ -1625,9 +1614,12 @@ class PhysicsWorld {
     }
     return tmin;
   }
-  get bodyCount(){ return this.bodies.length; }
-  get activeCount(){ return this.dynamicBodies.length; }
+  isGrounded(x, y, z, radius) {
+    const hit = this.raycast(x, y, z, 0, -1, 0, radius + 0.3, b => b.isStatic || b.userData?.type === 'obstacle');
+    return !!hit || y <= radius + 0.1;
+  }
 }
+    
 
 /* ============================================================
    [17] AudioSystem
