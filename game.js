@@ -1240,23 +1240,36 @@ _raycastBullet(owner, ox, oy, oz, dirX, dirY, dirZ, baseEnergy, range, weaponDef
   if (player.hp <= 0 && player.alive) this._playerDown();
 }
 
-  _killEnemy(enemy){
-    enemy.alive = false;
-    enemy.body.alive = false;
-    this.physics.remove(enemy.body);
-    if (enemy.mesh) enemy.mesh.visible = false;
-    this.player.kills++;
-    this.stats.kills++;
+ _killEnemy(enemy, dmg, dist){
+  enemy.alive = false;
+  enemy.body.alive = false;
+  this.physics.remove(enemy.body);
+  if (enemy.mesh) enemy.mesh.visible = false;
+  this.player.kills++;
+  this.stats.kills++;
 
-    this._spawnSpark(enemy.body.position.x, enemy.body.position.z);
+  this._spawnSpark(enemy.body.position.x, enemy.body.position.z);
+  this.tasks.progress('kill', 1, { faction: enemy.spec.faction });
+  this._processModeHook('onEnemyKilled', enemy);
 
-    this.tasks.progress('kill', 1, { faction: enemy.spec.faction });
-    this._processModeHook('onEnemyKilled', enemy);
+  // ★ 小播报
+  this._addKillFeed(enemy.spec.name, Math.round(dmg), dist);
+}
 
-    this._log(this.engine.i18n.t('log.enemy_killed', {
-      name: this.engine.i18n.t(enemy.spec.name),
-    }), 'g');
-  }
+_addKillFeed(name, dmg, dist) {
+  const feed = document.getElementById('kill-feed');
+  if (!feed) return;
+  const el = document.createElement('div');
+  el.style.cssText = 'background:rgba(0,0,0,0.6); padding:4px 10px; border-left:3px solid #ff5a5a; border-radius:4px; animation: slideIn 0.2s ease-out;';
+  el.innerHTML = `击败 <b style="color:#ff8b7b">${this.engine.i18n.t(name)}</b> <span style="color:#aaa;font-size:11px;">(${dist}m · ${dmg}伤害)</span>`;
+  feed.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transition = 'opacity 0.5s';
+    setTimeout(() => el.remove(), 500);
+  }, 3000);
+  while (feed.children.length > 5) feed.removeChild(feed.firstChild);
+}
 
   _playerDown(){
     const p = this.player;
