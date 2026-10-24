@@ -342,54 +342,109 @@ class HUDSystem {
     }
   }
 
-  update(){
-    const p = this.world.player;
-    if (!p) return;
+ update(){
+  const p = this.world.player;
+  if (!p) return;
 
-    this._initEls();
-    this._bindProtectionButtons();
+  this._initEls();
+  this._bindProtectionButtons();
+  this._applyVisibility();
 
-    // ★ [Profile] 显隐控制
-    this._applyVisibility();
+  // 数值更新
+  this._setText('player-name', p.charSpec ? this.engine.i18n.t(p.charSpec.name) : '—');
+  this._setText('player-tag', p.charSpec ? this.engine.i18n.t(p.charSpec.tag) : '—');
 
-    // 数值更新
-    this._setText('player-name', p.charSpec ? this.engine.i18n.t(p.charSpec.name) : '—');
-    this._setText('player-tag', p.charSpec ? this.engine.i18n.t(p.charSpec.tag) : '—');
+  // 更新血量与体力
+  const hpPct = Math.max(0, Math.min(100, p.hp / p.maxHp * 100));
+  this._setStyle('hp-bar', 'width', hpPct + '%');
+  this._setText('hp-text', Math.round(hpPct) + '%');
 
-    const hpPct = Math.max(0, Math.min(100, p.hp / p.maxHp * 100));
-    this._setStyle('hp-bar', 'width', hpPct + '%');
-    this._setText('hp-text', Math.round(hpPct) + '%');
-
-    if (p.charSpec && p.charSpec.prazer) {
-      const cpPct = Math.max(0, Math.min(100, p.coupling / p.maxCoupling * 100));
-      this._setStyle('cp-bar', 'width', cpPct + '%');
-      this._setText('cp-text', Math.round(cpPct) + '%');
-    }
-
-    if (p.weapon) {
-      this._setText('weapon-name', this.engine.i18n.t(p.weapon.def.name));
-      this._setText('ammo-mag', String(p.weapon.mag));
-      this._setText('ammo-reserve', String(p.weapon.reserve));
-    }
-
-    if (p.stamina !== undefined) {
-      const stPct = Math.max(0, Math.min(100, p.stamina / p.maxStamina * 100));
-      this._setStyle('stamina-bar', 'width', stPct + '%');
-      // 体力不足时变红
-      this._setStyle('stamina-bar', 'background', stPct < 20 ? '#ff5b5b' : 'linear-gradient(90deg,#ffd93d,#fff08a)');
-    }
-
-    // 防护按钮可用性
-    if (this._protectBtns) {
-      const canProtect = p.charSpec && p.charSpec.prazer && p.coupling > 0;
-      for (const btn of this._protectBtns) {
-        btn.classList.toggle('dead', !canProtect);
-      }
-    }
-
-    // 撤离进度
-    this._renderExtractProgress();
+  if (p.stamina !== undefined) {
+    const stPct = Math.max(0, Math.min(100, p.stamina / p.maxStamina * 100));
+    this._setStyle('stamina-bar', 'width', stPct + '%');
+    this._setStyle('stamina-bar', 'background', stPct < 20 ? '#ff5b5b' : 'linear-gradient(90deg,#ffd93d,#fff08a)');
   }
+
+  if (p.charSpec && p.charSpec.prazer) {
+    const cpPct = Math.max(0, Math.min(100, p.coupling / p.maxCoupling * 100));
+    this._setStyle('cp-bar', 'width', cpPct + '%');
+    this._setText('cp-text', Math.round(cpPct) + '%');
+  }
+
+  // 武器与弹药
+  if (p.weapon) {
+    this._setText('weapon-name', this.engine.i18n.t(p.weapon.def.name));
+    this._setText('ammo-mag', String(p.weapon.mag));
+    this._setText('ammo-reserve', String(p.weapon.reserve));
+  }
+
+  // ★ 核心：受伤视觉状态机
+  this._updateHurtFX(hpPct);
+  
+  // ★ 核心：耦合视觉特效
+  this._updateCouplingFX(p);
+  
+  // ★ 核心：玩家模型描边发光
+  if (p.auraMesh) {
+    if (p.protectionHold && p.coupling > 0) {
+      p.auraMesh.visible = true;
+      // 根据防护等级变色
+      const colors = { L1: 0x50ff8a, L2: 0x50aaff, L3: 0xc878ff };
+      const targetColor = colors[p.protection] || 0xffffff;
+      p.auraMesh.material.color.setHex(targetColor);
+      // 随耦合能多少微弱闪烁
+      p.auraMesh.material.opacity = 0.3 + (p.coupling / p.maxCoupling) * 0.4 + Math.sin(this.world.time * 10) * 0.1;
+    } else {
+      p.auraMesh.visible = false;
+    }
+  }
+
+  // 撤离进度
+  this._renderExtractProgress();
+}
+
+// 受伤视觉引擎
+_updateHurtFX(hpPct) {
+  const filterEl = document.getElementById('fx-filter');
+  const vignetteEl = document.getElementById('fx-vignette');
+  
+  if (hpPct > 75) {
+    filterEl.style.backdropFilter = 'none';
+    vignetteEl.style.opacity = 0;
+  } else if (hpPct > 50) {
+    filterEl.style.backdropFilter = 'blur(1px) grayscale(0.2)';
+    vignetteEl.style.opacity = 0.2;
+  } else if (hpPct > 25) {
+    filterEl.style.backdropFilter = 'blur(2px) grayscale(0.5) contrast(1.2)';
+    vignetteEl.style.opacity = 0.5;
+  } else {
+    // 濒死状态：模糊、色差、暗角
+    filterEl.style.backdropFilter = 'blur(3px) grayscale(0.8) contrast(1.5) hue-rotate(-10deg)';
+    vignetteEl.style.opacity = 0.8;
+    // 加入脉冲呼吸感
+    vignetteEl.style.opacity = 0.5 + Math.sin(this.world.time * 8) * 0.3;
+  }
+}
+
+// 耦合屏幕边缘光效
+_updateCouplingFX(p) {
+  const el = document.getElementById('fx-coupling');
+  if (!el) return;
+  
+  if (p.protectionHold && p.coupling > 0) {
+    let color = 'rgba(255,255,255,0.4)';
+    let innerColor = 'rgba(255,255,255,0.1)';
+    if (p.protection === 'L1') { color = 'rgba(80,255,150,0.6)'; innerColor = 'rgba(80,255,150,0.1)'; }
+    if (p.protection === 'L2') { color = 'rgba(80,170,255,0.6)'; innerColor = 'rgba(80,170,255,0.1)'; }
+    if (p.protection === 'L3') { color = 'rgba(200,120,255,0.6)'; innerColor = 'rgba(200,120,255,0.1)'; }
+    
+    el.style.boxShadow = `inset 0 0 80px 20px ${color}`;
+    el.style.background = `radial-gradient(circle, transparent 60%, ${innerColor} 100%)`;
+  } else {
+    el.style.boxShadow = 'none';
+    el.style.background = 'none';
+  }
+}
 
   _applyVisibility(){
     const profile = this.engine.profile;
