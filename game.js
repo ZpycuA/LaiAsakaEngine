@@ -1183,14 +1183,11 @@ _raycastBullet(owner, dirX, dirY, dirZ, baseEnergy, range, weaponDef, ammoDef, i
     this._fireWeapon(enemy, enemy.weapon, false);
   }
 
-  _damageEnemy(enemy, energy, pen){
+ _damageEnemy(enemy, energy, pen, isHead = false){
   if (!enemy.alive) return;
-
   const profile = this.engine.profile;
-  const isHead = Math.random() < 0.1;
+  
   let finalEnergy = isHead ? energy * COMBAT.HEAD_MULT : energy;
-
-  // ★ 修复：爆头即死时，伤害刚好等于敌人的剩余血量，不再用无限大
   if (isHead && profile.get('combat.headshotInstantKill', false)) {
     finalEnergy = enemy.maxHp * COMBAT.BODY_COEFF_HUMAN; 
   }
@@ -1200,13 +1197,14 @@ _raycastBullet(owner, dirX, dirY, dirZ, baseEnergy, range, weaponDef, ammoDef, i
   enemy.hitFlash = 0.15;
   this.player.dealt += dmg;
   this.stats.hits++;
-  if (isHead) this.stats.headshots++;
+  
+  // ★ 命中标记反馈
+  this._hitMarker(isHead);
 
-  this._spawnDamageNumber(enemy.body.position.x, enemy.body.position.z, Math.round(dmg), 'enemy');
-  this._hitMarker();
-  this._playSFX('hit', { volume: 0.4 });
-
-  if (enemy.hp <= 0 && enemy.alive) this._killEnemy(enemy);
+  if (enemy.hp <= 0 && enemy.alive) {
+    const dist = Math.round(Math.hypot(this.player.body.position.x - enemy.body.position.x, this.player.body.position.z - enemy.body.position.z));
+    this._killEnemy(enemy, dmg, dist);
+  }
 }
 
  _damagePlayer(player, energy, pen){
