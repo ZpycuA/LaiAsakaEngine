@@ -241,6 +241,13 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
       <div class="section-label"><span data-i18n="ui.menu.section_mode">模式</span><span class="hint" id="mode-hint"></span></div>
       <div class="options" id="mode-options"></div>
     </div>
+     <div class="section">
+  <div class="section-label">
+    <span>计划树 (Asaka)</span>
+    <span class="hint">未解锁</span>
+  </div>
+  <button class="btn ghost" id="btn-plan-tree" style="opacity:0.5">查看计划树（开发中）</button>
+     </div>
 
     <!-- 地图 -->
     <div class="section">
@@ -407,14 +414,20 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
 
   <!-- 结算浮层 -->
   <div class="overlay" id="result-screen">
-    <h2 id="result-title">—</h2>
-    <div class="stat" id="result-stats"></div>
-    <div class="row">
-      <button id="btn-again" data-i18n="ui.result.again">再来一次</button>
-      <button id="btn-menu" class="gold" data-i18n="ui.result.menu">返回菜单</button>
-    </div>
+  <h2 id="result-title">—</h2>
+  <div class="stat" id="result-stats"></div>
+  
+  <!-- 伤害日志（死亡回放） -->
+  <div id="damage-log-container" style="display:none; width:100%; max-width:600px; max-height:40vh; overflow-y:auto; margin-bottom:16px; background:rgba(0,0,0,0.5); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); text-align:left; font-size:12px;">
+    <div style="color:var(--accent); margin-bottom:8px; font-weight:bold;">交战记录 (最近 50 条)</div>
+    <div id="damage-log-list" style="display:flex; flex-direction:column; gap:4px;"></div>
   </div>
-</div>
+
+  <div class="row" id="result-actions">
+    <button id="btn-again" data-i18n="ui.result.again">再来一次</button>
+    <button id="btn-menu" class="gold" data-i18n="ui.result.menu">返回菜单</button>
+  </div>
+  </div>
 
 <!-- ============================================================
      Dev Console · 调试控制台
