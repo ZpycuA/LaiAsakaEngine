@@ -1309,10 +1309,10 @@ _raycastBullet(owner, ox, oy, oz, dirX, dirY, dirZ, baseEnergy, range, weaponDef
     const isHeadshot = endY > (targetBody.position.y + 1.2) && endY < (targetBody.position.y + 2.5);
 
     if (isPlayer && hit.body.userData.type === 'enemy') {
-      this._damageEnemy(hit.body.userData.ref, energy, pen, isHeadshot);
-    } else if (!isPlayer && hit.body.userData.type === 'player') {
-      this._damagePlayer(hit.body.userData.ref, energy, pen, isHeadshot);
-    }
+  this._damageEnemy(hit.body.userData.ref, energy, pen, isHeadshot);
+} else if (!isPlayer && hit.body.userData.type === 'player') {
+  this._damagePlayer(hit.body.userData.ref, energy, pen, isHeadshot, ox, oz, owner);
+}
     return;
   }
 
