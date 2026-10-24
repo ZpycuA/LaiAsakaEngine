@@ -1600,7 +1600,7 @@ _addKillFeed(name, dmg, dist) {
   _hurtFX(){
   const el = document.getElementById('fx-hit-flash');
   if (!el) return;
-  el.style.opacity = '1';
+  el.style.opacity = '0.2';
   setTimeout(() => {
     el.style.opacity = '0';
   }, 80);
