@@ -953,12 +953,15 @@ class Renderer3D {
     this._lightGroup.add(rim);
   }
 
-  resize(){
+    resize(){
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-  }
+    // 强制覆盖 Canvas 的 CSS，解决 UI 缩放问题
+    this.canvas.style.width = '100vw';
+    this.canvas.style.height = '100vh';
+    }
 
   clearScene(){
     while (this.scene.children.length) {
@@ -1210,9 +1213,9 @@ class CameraController {
   constructor(camera, opts){
     this.camera = camera;
     this.yaw = 0;
-    this.pitch = 0.6;
-    this.distance = 20;
-    this.followSpeed = opts.followSpeed || 0.15;
+    this.pitch = 0.2; 
+    this.distance = 6; 
+    this.followSpeed = opts.followSpeed || 0.2;
     this.target = { x: 0, y: 0, z: 0 };
     this.shakeIntensity = 0;
     this.shakeTimer = 0;
@@ -1223,7 +1226,7 @@ class CameraController {
   
   rotate(dx, dy) {
     this.yaw -= dx * 0.005;
-    this.pitch = clamp(this.pitch - dy * 0.005, 0.1, 1.4);
+    this.pitch = clamp(this.pitch - dy * 0.005, -0.5, 1.2);
   }
 
   shake(amount, duration){
@@ -1242,13 +1245,16 @@ class CameraController {
 
     const ox = this.target.x + this.shakeOffset.x - Math.sin(this.yaw) * Math.cos(this.pitch) * this.distance;
     const oz = this.target.z + this.shakeOffset.z + Math.cos(this.yaw) * Math.cos(this.pitch) * this.distance;
-    const oy = this.target.y + Math.sin(this.pitch) * this.distance;
+    const oy = this.target.y + 2.0 + Math.sin(this.pitch) * this.distance;
 
     this.camera.position.x = lerp(this.camera.position.x, ox, this.followSpeed);
     this.camera.position.y = lerp(this.camera.position.y, oy, this.followSpeed);
     this.camera.position.z = lerp(this.camera.position.z, oz, this.followSpeed);
     
-    this.camera.lookAt(this.target.x, this.target.y + 1.5, this.target.z);
+    const lookX = this.target.x + Math.sin(this.yaw) * 2;
+    const lookY = this.target.y + 1.5;
+    const lookZ = this.target.z - Math.cos(this.yaw) * 2;
+    this.camera.lookAt(lookX, lookY, lookZ);
   }
 }
 
