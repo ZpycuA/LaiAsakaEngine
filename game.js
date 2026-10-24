@@ -1828,7 +1828,6 @@ export class GameApp {
       title.textContent = e.i18n.t(success ? 'ui.result.extract_success' : 'ui.result.operation_failed');
       title.className = success ? 'success' : 'fail';
 
-      // 给所有 stats 属性加空值保护
       const statLines = [
         `击杀：<b>${stats.kills || 0}</b>　命中率：<b>${stats.accuracy || 0}%</b>`,
         `造成伤害：<b>${stats.dealt || 0}</b>　承受伤害：<b>${stats.taken || 0}</b>`,
@@ -1844,6 +1843,7 @@ export class GameApp {
 
       document.getElementById('result-screen').classList.add('on');
       document.getElementById('pause-screen').classList.remove('on');
+      document.getElementById('mobile-controls').style.display = 'none';
 
       e.bus.emit('matchEnded', { success, stats, reward: finalReward, assessment });
     } catch (err) {
