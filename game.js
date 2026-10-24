@@ -2088,7 +2088,7 @@ export class GameApp {
   });
 }
 
-     _setupMobileControls(isMobile) {
+   _setupMobileControls(isMobile) {
     let container = document.getElementById('mobile-controls');
     if (!container) {
       container = document.createElement('div');
@@ -2101,17 +2101,39 @@ export class GameApp {
       container.style.display = 'none';
       return;
     }
-
     container.style.display = 'block';
-
-    // 如果已经生成过，直接返回（避免重复生成）
     if (container.children.length > 0) return;
 
-    // 可维护的键位表配置
+    // ★ 左侧摇杆区域（透明触摸层，用于生成虚拟摇杆）
+    const leftStick = document.createElement('div');
+    leftStick.style.cssText = 'position:absolute;left:0;bottom:0;width:45%;height:60%;pointer-events:auto;touch-action:none;';
+    let leftStickId = null;
+
+    leftStick.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return;
+      leftStickId = e.pointerId;
+      this.engine.input.startLeftStick(e.clientX, e.clientY, leftStickId);
+    });
+    leftStick.addEventListener('pointermove', (e) => {
+      if (e.pointerId === leftStickId) this.engine.input.moveLeftStick(e.clientX, e.clientY);
+    });
+    const endLeft = (e) => {
+      if (e.pointerId === leftStickId) {
+        this.engine.input.endLeftStick();
+        leftStickId = null;
+      }
+    };
+    leftStick.addEventListener('pointerup', endLeft);
+    leftStick.addEventListener('pointercancel', endLeft);
+
+    container.appendChild(leftStick);
+
+    // ★ 右侧按钮布局（增加冲刺和跳跃）
     const layout = [
-      { id: 'fire', label: '开火', right: '20px', bottom: '80px', size: 80, color: 'rgba(255,80,80,.3)', border: 'rgba(255,100,100,.6)' },
-      { id: 'jump', label: '跳跃', right: '120px', bottom: '40px', size: 60, color: 'rgba(80,255,150,.3)', border: 'rgba(100,255,150,.6)' },
-      { id: 'reload', label: '换弹', right: '20px', bottom: '180px', size: 60, color: 'rgba(200,200,200,.3)', border: 'rgba(255,255,255,.6)' }
+      { id: 'fire', label: '开火', right: '20px', bottom: '80px', size: 80, color: 'rgba(255,80,80,.4)', border: 'rgba(255,100,100,.8)' },
+      { id: 'jump', label: '跳跃', right: '120px', bottom: '40px', size: 60, color: 'rgba(80,255,150,.4)', border: 'rgba(100,255,150,.8)' },
+      { id: 'reload', label: '换弹', right: '20px', bottom: '180px', size: 60, color: 'rgba(200,200,200,.3)', border: 'rgba(255,255,255,.6)' },
+      { id: 'sprint', label: '疾跑', right: '90px', bottom: '120px', size: 55, color: 'rgba(255,200,80,.4)', border: 'rgba(255,200,80,.8)' }
     ];
 
     for (const btn of layout) {
@@ -2123,7 +2145,7 @@ export class GameApp {
         color:#fff;display:flex;align-items:center;justify-content:center;
         pointer-events:auto;font-weight:800;font-size:14px;
         user-select:none;-webkit-user-select:none;touch-action:none;
-        box-shadow:0 4px 12px rgba(0,0,0,.4);
+        box-shadow:0 4px 12px rgba(0,0,0,.4);z-index:36;
       `;
       el.textContent = btn.label;
       
@@ -2145,5 +2167,5 @@ export class GameApp {
       
       container.appendChild(el);
     }
-     }
+  }
 }
