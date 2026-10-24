@@ -1520,7 +1520,7 @@ export class GameApp {
     this._registerDevCommands();
   }
 
-  _setupMenu(){
+    _setupMenu(){
     const e = this.engine;
     const i18n = e.i18n;
 
@@ -1562,7 +1562,6 @@ export class GameApp {
       (item) => { this.menuState.char = item.id; }
     );
 
-    // ★ [Profile] 玩法预设
     this._renderOptions(
       'profile-options',
       e.profile.list(),
@@ -1575,10 +1574,14 @@ export class GameApp {
       }
     );
 
-    // 初始应用 + 实时监听
+    this._renderCustomSettings();
+
     e.profile.setProfile(this.menuState.profile);
     this._updateDifficultyDisplay();
-    e.profile.onChange(() => this._updateDifficultyDisplay());
+    e.profile.onChange(() => {
+      this._updateDifficultyDisplay();
+      this._syncCustomSettingsUI();
+    });
 
     this._updateModeHint();
     this._menuReady = true;
