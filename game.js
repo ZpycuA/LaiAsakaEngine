@@ -1763,17 +1763,18 @@ export class GameApp {
     const e = this.engine;
     this._lastMatchKind = kind;
 
-    // ★ 识别平台
+    // 强制清理所有遮罩
+    document.getElementById('result-screen').classList.remove('on');
+    document.getElementById('pause-screen').classList.remove('on');
+    document.getElementById('game-screen').classList.add('on');
+    document.getElementById('crosshair').style.display = 'block';
+
+    // 平台识别与移动端按键生成
     let isMobile = this.platform === 'mobile';
     if (this.platform === 'auto') isMobile = 'ontouchstart' in window;
     
-    if (isMobile) {
-      e.input.enableVirtualJoysticks = true;
-      document.getElementById('crosshair').style.display = 'block';
-    } else {
-      e.input.enableVirtualJoysticks = false;
-      document.getElementById('crosshair').style.display = 'block';
-    }
+    e.input.enableVirtualJoysticks = isMobile;
+    this._setupMobileControls(isMobile);
 
     this._bindCameraControls();
 
@@ -1793,8 +1794,6 @@ export class GameApp {
 
       this.world.onEnd = (success, stats) => this._onMatchEnd(success, stats);
       this.world.start();
-
-      this._showScreen('game');
       e.bus.emit('matchStarted', { kind });
     } catch (err) {
       console.error('[GameApp] startMatch failed:', err);
