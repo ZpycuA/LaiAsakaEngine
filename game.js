@@ -589,10 +589,13 @@ class GameWorld {
     }
   }
 
-  _spawnPlayer(){
+    _spawnPlayer(){
     const spec = this.charSpec;
     const mesh = this.engine.meshes.build('player', spec);
     this.engine.renderer.scene.add(mesh);
+    
+    // ★ FPS模式隐藏玩家身体
+    mesh.visible = false;
 
     const body = this.physics.add(new Body({
       x: 0, z: 0,
