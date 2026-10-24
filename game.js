@@ -1005,7 +1005,6 @@ class GameWorld {
   this._syncMeshes();
 
   if (this.player) {
-    // ★ 眼睛高度设为物理体 Y 坐标 + 1.5
     this.engine.cameraCtl.follow(
       this.player.body.position.x, 
       this.player.body.position.y + 1.5, 
