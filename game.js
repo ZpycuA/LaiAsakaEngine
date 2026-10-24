@@ -1975,79 +1975,73 @@ export class GameApp {
     }
     return ok;
   }
- _bindCameraControls() {
+_bindCameraControls() {
   if (this._camBound) return;
   this._camBound = true;
   const canvas = this.engine.renderer.canvas;
   const e = this.engine;
-  
-  let dragId = null;
-  let lastX = 0, lastY = 0;
 
-  // PC端鼠标
-  canvas.addEventListener('mousedown', (ev) => {
-    dragId = 'mouse';
-    lastX = ev.clientX; lastY = ev.clientY;
-  });
+  // PC端
+  let mouseDrag = false;
+  canvas.addEventListener('mousedown', () => mouseDrag = true);
+  window.addEventListener('mouseup', () => mouseDrag = false);
   window.addEventListener('mousemove', (ev) => {
-    if (dragId === 'mouse') {
-      const dx = ev.clientX - lastX;
-      const dy = ev.clientY - lastY;
-      lastX = ev.clientX; lastY = ev.clientY;
-      e.cameraCtl.rotate(dx, dy);
-    }
+    if (mouseDrag) e.cameraCtl.rotate(ev.movementX, ev.movementY);
   });
-  window.addEventListener('mouseup', () => { dragId = null; });
 
-  // 移动端原生 Touch（严格区分左右）
+  // 移动端原生多点触控
   canvas.addEventListener('touchstart', (ev) => {
+    // 阻止默认事件（防止缩放/滚动/选中）
+    ev.preventDefault(); 
     for (let i = 0; i < ev.changedTouches.length; i++) {
       const t = ev.changedTouches[i];
+      // 判断是否点在了 UI 按钮上
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      if (el && (el.closest('.mobile-btn') || el.closest('button'))) {
+        continue; // 点按钮就跳过，交给按钮自己的监听器处理
+      }
+
+      // 严格的左右屏划分：左半屏摇杆，右半屏视角
       if (t.clientX < window.innerWidth * 0.45) {
-        // 左手：生成摇杆
         e.input.startLeftStick(t.clientX, t.clientY, t.identifier);
       } else {
-        // 右手：接管视角，但如果摸到了按钮就不转视角
-        const el = document.elementFromPoint(t.clientX, t.clientY);
-        if (el && el.closest('#mobile-controls button') === null && el.closest('#mobile-controls .mobile-btn') === null) {
-          if (dragId === null) {
-            dragId = t.identifier;
-            lastX = t.clientX; lastY = t.clientY;
-          }
+        e.input.startRightDrag(t.clientX, t.clientY, t.identifier);
+      }
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (ev) => {
+    ev.preventDefault();
+    for (let i = 0; i < ev.changedTouches.length; i++) {
+      const t = ev.changedTouches[i];
+      
+      if (e.input.touch.left && e.input.touch.left.id === t.identifier) {
+        e.input.moveLeftStick(t.clientX, t.clientY);
+      } else if (e.input.touch.right && e.input.touch.right.id === t.identifier) {
+        const delta = e.input.moveRightDrag(t.clientX, t.clientY);
+        if (delta) {
+          e.cameraCtl.rotate(delta.dx * 1.5, delta.dy * 1.5);
         }
       }
     }
-  }, { passive: true });
-
-  canvas.addEventListener('touchmove', (ev) => {
-    for (let i = 0; i < ev.changedTouches.length; i++) {
-      const t = ev.changedTouches[i];
-      if (e.input.touch.left && e.input.touch.left.id === t.identifier) {
-        e.input.moveLeftStick(t.clientX, t.clientY);
-      } else if (dragId === t.identifier) {
-        const dx = t.clientX - lastX;
-        const dy = t.clientY - lastY;
-        lastX = t.clientX; lastY = t.clientY;
-        e.cameraCtl.rotate(dx * 1.5, dy * 1.5); // 增大移动端视角灵敏度
-      }
-    }
-  }, { passive: true });
+  }, { passive: false });
 
   const endTouch = (ev) => {
+    ev.preventDefault();
     for (let i = 0; i < ev.changedTouches.length; i++) {
       const t = ev.changedTouches[i];
       if (e.input.touch.left && e.input.touch.left.id === t.identifier) {
         e.input.endLeftStick();
-      } else if (dragId === t.identifier) {
-        dragId = null;
+      } else if (e.input.touch.right && e.input.touch.right.id === t.identifier) {
+        e.input.endRightDrag();
       }
     }
   };
-  canvas.addEventListener('touchend', endTouch, { passive: true });
-  canvas.addEventListener('touchcancel', endTouch, { passive: true });
-  
-  window.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('touchend', endTouch, { passive: false });
+  canvas.addEventListener('touchcancel', endTouch, { passive: false });
 }
+
+
 
  _renderCustomSettings(){
   const el = document.getElementById('custom-settings');
