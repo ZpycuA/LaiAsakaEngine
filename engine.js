@@ -653,6 +653,9 @@ class InputSystem {
     this.joystickLeft = null;
     this.enableVirtualJoysticks = false;
     this.virtualActions = new Map();
+    this.gyroEnabled = false;
+    this.gyroSensitivity = 1.0;
+    this.currentGyro = { alpha: 0, beta: 0, gamma: 0 };
   }
 
   registerAction(name, cfg){ this.actions.set(name, cfg || {}); return this; }
@@ -757,6 +760,20 @@ class InputSystem {
     });
     canvas.addEventListener('contextmenu', e => e.preventDefault());
   }
+
+   async enableGyro() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const state = await DeviceOrientationEvent.requestPermission();
+        if (state === 'granted') this._bindGyro();
+      } catch (e) {
+        console.error('陀螺仪授权失败', e);
+      }
+    } else {
+      this._bindGyro();
+    }
+   }
+   
 }
       
 
