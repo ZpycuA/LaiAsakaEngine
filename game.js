@@ -1474,14 +1474,20 @@ _addKillFeed(name, dmg, dist) {
     setTimeout(() => el.remove(), 750);
   }
 
-  _hitMarker(){
-    // ★ [Profile] 命中标记显隐
-    if (!this.engine.profile.get('visual.hitMarkers', true)) return;
-    const ch = document.getElementById('crosshair');
-    if (!ch) return;
-    ch.style.filter = 'brightness(2)';
-    setTimeout(() => { ch.style.filter = ''; }, 80);
-  }
+  _hitMarker(isHead = false){
+  const el = document.getElementById('hit-marker');
+  if (!el) return;
+  el.style.opacity = '1';
+  // 如果爆头，稍微放大并变色
+  el.style.transform = isHead ? 'scale(1.3)' : 'scale(1)';
+  if (isHead) el.querySelectorAll('line').forEach(l => l.setAttribute('stroke', '#ff3030'));
+  else el.querySelectorAll('line').forEach(l => l.setAttribute('stroke', '#ffdd44'));
+
+  clearTimeout(this._hitTimer);
+  this._hitTimer = setTimeout(() => {
+    el.style.opacity = '0';
+  }, 150);
+}
 
   _hurtFX(){
   const el = document.getElementById('fx-hit-flash');
