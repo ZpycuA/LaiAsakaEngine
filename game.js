@@ -372,6 +372,13 @@ class HUDSystem {
       this._setText('ammo-reserve', String(p.weapon.reserve));
     }
 
+    if (p.stamina !== undefined) {
+      const stPct = Math.max(0, Math.min(100, p.stamina / p.maxStamina * 100));
+      this._setStyle('stamina-bar', 'width', stPct + '%');
+      // 体力不足时变红
+      this._setStyle('stamina-bar', 'background', stPct < 20 ? '#ff5b5b' : 'linear-gradient(90deg,#ffd93d,#fff08a)');
+    }
+
     // 防护按钮可用性
     if (this._protectBtns) {
       const canProtect = p.charSpec && p.charSpec.prazer && p.coupling > 0;
