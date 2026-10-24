@@ -1596,8 +1596,18 @@ _addKillFeed(name, dmg, dist) {
     }
     const lootValue = 100 + Math.floor(Math.random() * 400);
     this.player.carriedValue += lootValue;
+    this.combatLog.push({
+  type: 'search', t: this.time,
+  containerType: '物资容器',
+});
     this.tasks.progress('loot', 1);
     this._log('搜索完成 · 获得物资 ' + lootValue + ' cp', 'g');
+    this.combatLog.push({
+  type: 'loot', t: this.time,
+  name: '物资箱战利品',
+  value: lootValue,
+  qty: 1,
+});
   }
 
   _useSkill(slot){
