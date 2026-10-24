@@ -1587,15 +1587,19 @@ export class GameApp {
     this._menuReady = true;
   }
 
-  _updateDifficultyDisplay(){
+    _updateDifficultyDisplay(){
     const el = document.getElementById('difficulty-display');
     if (!el) return;
     const a = this.engine.profile.assess();
     const i18n = this.engine.i18n;
     const color = a.score >= 0.7 ? 'var(--danger)' : a.score >= 0.4 ? 'var(--gold)' : 'var(--green)';
-    el.innerHTML =
-      `<div>
-        <span style="color:var(--dim)">${i18n.t('ui.menu.difficulty_label') || '实时难度'}</span>
+    
+    const diffLabel = i18n.t('ui.menu.difficulty_label');
+    const finalLabel = diffLabel === 'ui.menu.difficulty_label' ? '实时难度' : diffLabel;
+
+    el.innerHTML = `
+      <div>
+        <span style="color:var(--dim)">${finalLabel}</span>
         <span style="color:${color};font-weight:800;font-size:20px;margin-left:8px">${Math.round(a.score * 100)}</span>
         <span style="color:var(--dim2);font-size:10px"> / 100</span>
       </div>
