@@ -1560,6 +1560,11 @@ class PhysicsWorld {
       }
     }
   }
+  // 检查某个点下方是否有地面
+  isGrounded(x, y, z, radius) {
+  const hit = this.raycast(x, y, z, 0, -1, 0, radius + 0.2, b => b.isStatic || b.userData?.type === 'obstacle');
+  return !!hit;
+}
   /* ---- 射线检测 ---- */
   raycast(ox, oy, oz, dx, dy, dz, maxDist, filter){
     const len = Math.hypot(dx, dz) || 1;
