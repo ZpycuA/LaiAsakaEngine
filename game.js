@@ -633,7 +633,7 @@ class GameWorld {
     }));
 
     this.player = {
-      mesh, body,
+      mesh, body,auraMesh,
       charSpec: spec,
       charId: spec.id,
       hp: spec.hp,
