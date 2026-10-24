@@ -1238,16 +1238,15 @@ class CameraController {
     this.camera = camera;
     this.yaw = 0;
     this.pitch = 0;
-    this.distance = 0; // ★ 第一人称距离为 0
+    this.distance = 0; 
     this.followSpeed = opts.followSpeed || 0.2;
-    this.target = { x: 0, y: 1.6, z: 0 }; // 动态眼睛高度
+    this.target = { x: 0, y: 1.6, z: 0 }; 
     this.shakeIntensity = 0;
     this.shakeTimer = 0;
     this.shakeOffset = { x: 0, y: 0, z: 0 };
-    this.sensitivity = 1.0; // ★ 供外部调节
+    this.sensitivity = 1.0; 
   }
   
-  // ★ 接收 3D 坐标以支持跳跃和坠落
   follow(x, y, z){ 
     this.target.x = x; 
     this.target.y = y; 
@@ -1255,7 +1254,6 @@ class CameraController {
   }
   
   rotate(dx, dy) {
-    // 加入灵敏度乘数，同时降低基础倍率让微调更平滑
     this.yaw -= dx * 0.002 * this.sensitivity;
     this.pitch = clamp(this.pitch - dy * 0.002 * this.sensitivity, -Math.PI/2 + 0.1, Math.PI/2 - 0.1);
   }
