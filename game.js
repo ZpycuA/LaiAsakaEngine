@@ -999,45 +999,58 @@ class GameWorld {
   this._playSFX('shot_' + def.cls, { volume: 0.6 });
 }
 
-    _raycastBullet(owner, dirX, dirZ, baseEnergy, range, weaponDef, ammoDef, isPlayer){
-    const px = owner.body.position.x;
-    const pz = owner.body.position.z;
-    const ox = px + dirX * 1.0;
-    const oz = pz + dirZ * 1.0;
-    
-    // 过滤器
-    const hitFilter = isPlayer
-      ? (body) => body !== owner.body && (body.userData?.type === 'enemy' || body.userData?.type === 'obstacle')
-      : (body) => body !== owner.body && (body.userData?.type === 'player' || body.userData?.type === 'obstacle');
+   _raycastBullet(owner, dirX, dirY, dirZ, baseEnergy, range, weaponDef, ammoDef, isPlayer){
+  const px = owner.body.position.x;
+  const pz = owner.body.position.z;
+  const py = 1.6; // 眼睛高度发射
+  
+  const ox = px + dirX * 1.0;
+  const oy = py + dirY * 1.0;
+  const oz = pz + dirZ * 1.0;
+  
+  // 2D平面射线检测（目前的物理引擎是 2D 的，把障碍物投影到 XZ 平面）
+  const hitFilter = isPlayer
+    ? (body) => body !== owner.body && (body.userData?.type === 'enemy' || body.userData?.type === 'obstacle')
+    : (body) => body !== owner.body && (body.userData?.type === 'player' || body.userData?.type === 'obstacle');
 
-    const hit = this.physics.raycast(ox, 1.2, oz, dirX, 0, dirZ, range, hitFilter);
+  // 我们用 XZ 方向归一化去查 2D 碰撞
+  const lenXZ = Math.hypot(dirX, dirZ) || 1;
+  const hit = this.physics.raycast(ox, oy, oz, dirX/lenXZ, dirY, dirZ/lenXZ, range, hitFilter);
 
-    const endX = hit ? hit.point.x : ox + dirX * range;
-    const endZ = hit ? hit.point.z : oz + dirZ * range;
-    
-    // 画出弹道
-    this._spawnTracer(ox, oz, endX, endZ, isPlayer ? 0xffe08a : 0xff8b7b);
+  const dist2D = hit ? hit.t : range;
+  // 计算在 3D 空间里实际飞行的距离和落点
+  const actualDist = dist2D / (lenXZ || 1);
+  const endX = ox + dirX * actualDist;
+  const endY = oy + dirY * actualDist;
+  const endZ = oz + dirZ * actualDist;
+  
+  this._spawnTracer(ox, oy, oz, endX, endY, endZ, isPlayer ? 0xffe08a : 0xff8b7b);
 
-    if (!hit) return;
-
-    const distance = hit.t;
-    const realisticDrop = this.engine.profile.get('combat.bulletDrop', false);
-    const decayK = realisticDrop ? COMBAT.RANGE_DECAY_REALISTIC : COMBAT.RANGE_DECAY;
-    const energy = CombatSystem.energyAtRange(baseEnergy, distance, range, decayK);
-
-    const pen = ammoDef.tier || 0;
-
-    if (hit.body.userData.type === 'obstacle') {
-      this._spawnSpark(hit.point.x, hit.point.z);
-      return;
-    }
-
-    if (isPlayer && hit.body.userData.type === 'enemy') {
-      this._damageEnemy(hit.body.userData.ref, energy, pen);
-    } else if (!isPlayer && hit.body.userData.type === 'player') {
-      this._damagePlayer(hit.body.userData.ref, energy, pen);
-    }
+  if (endY <= 0) {
+    // 打在了地上
+    this._spawnSpark(endX, 0.1, endZ);
+    return;
   }
+
+  if (!hit) return;
+
+  const realisticDrop = this.engine.profile.get('combat.bulletDrop', false);
+  const decayK = realisticDrop ? COMBAT.RANGE_DECAY_REALISTIC : COMBAT.RANGE_DECAY;
+  const energy = CombatSystem.energyAtRange(baseEnergy, actualDist, range, decayK);
+
+  const pen = ammoDef.tier || 0;
+
+  if (hit.body.userData.type === 'obstacle') {
+    this._spawnSpark(endX, endY, endZ);
+    return;
+  }
+
+  if (isPlayer && hit.body.userData.type === 'enemy') {
+    this._damageEnemy(hit.body.userData.ref, energy, pen);
+  } else if (!isPlayer && hit.body.userData.type === 'player') {
+    this._damagePlayer(hit.body.userData.ref, energy, pen);
+  }
+}
 
   enemyFire(enemy, target){
     if (!enemy.alive || !enemy.weapon) return;
