@@ -1126,24 +1126,14 @@ _updatePlayer(dt){
   this._playSFX('shot_' + def.cls, { volume: 0.6 });
 }
 
-_raycastBullet(owner, dirX, dirY, dirZ, baseEnergy, range, weaponDef, ammoDef, isPlayer){
-  const px = owner.body.position.x;
-  const pz = owner.body.position.z;
-  const py = 1.6; 
-  
-  const ox = px + dirX * 1.0;
-  const oy = py + dirY * 1.0;
-  const oz = pz + dirZ * 1.0;
-  
+_raycastBullet(owner, ox, oy, oz, dirX, dirY, dirZ, baseEnergy, range, weaponDef, ammoDef, isPlayer){
   const hitFilter = isPlayer
     ? (body) => body !== owner.body && (body.userData?.type === 'enemy' || body.userData?.type === 'obstacle')
     : (body) => body !== owner.body && (body.userData?.type === 'player' || body.userData?.type === 'obstacle');
 
   const lenXZ = Math.hypot(dirX, dirZ) || 1;
-  // 查二维射线
   const hit = this.physics.raycast(ox, oy, oz, dirX/lenXZ, dirY, dirZ/lenXZ, range, hitFilter);
   
-  // 计算真实 3D 距离
   const dist2D = hit ? hit.t : range;
   const actualDist = dist2D / (lenXZ || 1);
   const endX = ox + dirX * actualDist;
@@ -1156,13 +1146,11 @@ _raycastBullet(owner, dirX, dirY, dirZ, baseEnergy, range, weaponDef, ammoDef, i
     this._spawnSpark(endX, 0.1, endZ);
     return;
   }
-
   if (!hit) return;
 
   const realisticDrop = this.engine.profile.get('combat.bulletDrop', false);
   const decayK = realisticDrop ? COMBAT.RANGE_DECAY_REALISTIC : COMBAT.RANGE_DECAY;
   const energy = CombatSystem.energyAtRange(baseEnergy, actualDist, range, decayK);
-
   const pen = ammoDef.tier || 0;
 
   if (hit.body.userData.type === 'obstacle') {
@@ -1170,10 +1158,14 @@ _raycastBullet(owner, dirX, dirY, dirZ, baseEnergy, range, weaponDef, ammoDef, i
     return;
   }
 
+  // ★ 新增：3D 高度爆头判定
+  const targetBody = hit.body;
+  const isHeadshot = endY > (targetBody.position.y + 1.2); // 假设敌人身高 2.4，1.2 以上算头
+
   if (isPlayer && hit.body.userData.type === 'enemy') {
-    this._damageEnemy(hit.body.userData.ref, energy, pen);
+    this._damageEnemy(hit.body.userData.ref, energy, pen, isHeadshot);
   } else if (!isPlayer && hit.body.userData.type === 'player') {
-    this._damagePlayer(hit.body.userData.ref, energy, pen);
+    this._damagePlayer(hit.body.userData.ref, energy, pen, isHeadshot);
   }
 }
 
