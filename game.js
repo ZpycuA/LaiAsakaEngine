@@ -1512,15 +1512,15 @@ _addKillFeed(name, dmg, dist) {
   while (feed.children.length > 5) feed.removeChild(feed.firstChild);
 }
 
-  _playerDown(){
-    this.combatLog.push({
-  type: 'downed',
-  t: this.time,
-  hp: p.hp,
-  maxHp: p.maxHp,
-});
-    const p = this.player;
-    p.alive = false;
+ _playerDown(){
+  const p = this.player;
+  this.combatLog.push({
+    type: 'downed',
+    t: this.time,
+    hp: p.hp,
+    maxHp: p.maxHp,
+  });
+  p.alive = false;
     this._processModeHook('onPlayerDowned');
     this._end(false);
   }
