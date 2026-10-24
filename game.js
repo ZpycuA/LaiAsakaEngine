@@ -2306,14 +2306,15 @@ hideCombatReport();
   }
 }
 
-    _onMatchEnd(success, stats){
-  try {
-    const e = this.engine;
-    const save = e.save;
-    const assessment = e.profile.assess();
+  _onMatchEnd(success, stats){
+try {
+  const e = this.engine;
+  const save = e.save;
+  const assessment = e.profile.assess();
 
-    /* ---- 存档 ---- */
-    save.data.stats = save.data.stats || { runs: 0, extracts: 0, deaths: 0, kills: 0 };
+  /* ---- 存档兜底 ---- */
+  if (!save.data) save.data = {};
+  if (!save.data.stats) save.data.stats = { runs: 0, extracts: 0, deaths: 0, kills: 0 };
     save.data.stats.runs++;
     if (success) save.data.stats.extracts++;
     else save.data.stats.deaths++;
