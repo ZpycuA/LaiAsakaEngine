@@ -461,79 +461,111 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
   }
 
   /* ---- 加载流程 ---- */
-  (async function boot() {
-    try {
-      setStatus('正在加载引擎核心…', 10);
-      const { Engine } = await import('./engine.js');
+(async function boot() {
+  try {
+    setStatus('正在加载引擎核心…', 10);
+    const { Engine } = await import('./engine.js');
 
-      setStatus('正在加载语言包…', 25);
-      const zhCN = (await import('./locale.zh-CN.js')).default;
-      const enUS = (await import('./locale.en-US.js')).default;
+    setStatus('正在加载语言包…', 25);
+    const zhCN = (await import('./locale.zh-CN.js')).default;
+    const enUS = (await import('./locale.en-US.js')).default;
 
-      setStatus('正在加载内容表…', 40);
-      const { registerDefaultContent } = await import('./content.js');
+    setStatus('正在加载内容表…', 40);
+    const { registerDefaultContent } = await import('./content.js');
 
-      setStatus('正在加载模式…', 55);
-      const { registerModes } = await import('./modes.js');
+    setStatus('正在加载模式…', 55);
+    const { registerModes } = await import('./modes.js');
 
-      setStatus('正在加载应用层…', 70);
-      const { GameApp } = await import('./game.js');
+    setStatus('正在加载应用层…', 70);
+    const { GameApp } = await import('./game.js');
 
-      setStatus('正在初始化引擎…', 85);
-      const engine = new Engine();
-      await engine.init({
-        canvas: document.getElementById('game-canvas'),
-        locale: { 'zh-CN': zhCN, 'en-US': enUS },
-        defaultLocale: 'zh-CN',
-      });
+    setStatus('正在初始化引擎…', 85);
+    const engine = new Engine();
+    await engine.init({
+      canvas: document.getElementById('game-canvas'),
+      locale: { 'zh-CN': zhCN, 'en-US': enUS },
+      defaultLocale: 'zh-CN',
+    });
 
-      // 注册内容
-      registerDefaultContent(engine);
+    // 注册内容
+    registerDefaultContent(engine);
 
-      // 注册模式（straight / asaka 接口）
-      registerModes(engine);
+    // 注册模式（straight / asaka 接口）
+    registerModes(engine);
 
-      // 应用层
-      const app = new GameApp(engine);
-      engine.app = app;
-      app.boot();
-
-      setStatus('就绪', 100);
-      setTimeout(() => {
-        const boot = document.getElementById('boot-screen');
-        const menu = document.getElementById('menu-screen');
-        if (boot) boot.classList.remove('on');
-        if (menu) menu.classList.add('on');
-        engine.start();
-      }, 300);
-
-      /* ---- 语言切换（顶层 UI，由 GameApp 接管具体渲染） ---- */
-      const langSelector = document.getElementById('lang-selector');
-      if (langSelector) {
-        langSelector.addEventListener('click', (ev) => {
-          const btn = ev.target.closest('[data-lang]');
-          if (!btn) return;
-          const lang = btn.dataset.lang;
-          langSelector.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('on', b === btn));
-          try {
-            app.setLanguage(lang);
-          } catch (e) {
-            console.error('[Lang] switch failed:', e);
-          }
-        });
-      }
-
-      /* ---- DEV 按钮 ---- */
-      const devBtn = document.getElementById('btn-dev-console');
-      if (devBtn) {
-        devBtn.addEventListener('click', () => {
-          if (engine.devConsole) engine.devConsole.toggle();
-        });
-      }
-    } catch (err) {
-      showError('启动失败：无法加载依赖文件', err);
+    // 应用层
+    const app = new GameApp(engine);
+    engine.app = app;
+    
+    // ★ 核心修复：在此处直接绑定入口按钮，绕过 game.js 的潜在错误
+    const btnStart = document.getElementById('btn-start');
+    const btnTrain = document.getElementById('btn-train');
+    
+    if (btnStart) {
+      btnStart.onclick = (e) => {
+        e.preventDefault();
+        try {
+          app.startMatch('normal');
+        } catch (err) {
+          console.error('进入战区失败', err);
+          alert('进入战区失败：\n' + (err.stack || err.message || String(err)));
+        }
+      };
     }
-  })();
+    
+    if (btnTrain) {
+      btnTrain.onclick = (e) => {
+        e.preventDefault();
+        try {
+          app.startMatch('training');
+        } catch (err) {
+          console.error('进入训练场失败', err);
+          alert('进入训练场失败：\n' + (err.stack || err.message || String(err)));
+        }
+      };
+    }
+
+    // 初始化菜单渲染
+    app.boot();
+
+    setStatus('就绪', 100);
+    setTimeout(() => {
+      const boot = document.getElementById('boot-screen');
+      const menu = document.getElementById('menu-screen');
+      if (boot) boot.classList.remove('on');
+      if (menu) menu.classList.add('on');
+      engine.start();
+    }, 300);
+
+    /* ---- 语言切换（顶层 UI，由 GameApp 接管具体渲染） ---- */
+    const langSelector = document.getElementById('lang-selector');
+    if (langSelector) {
+      langSelector.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('[data-lang]');
+        if (!btn) return;
+        const lang = btn.dataset.lang;
+        langSelector.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('on', b === btn));
+        try {
+          app.setLanguage(lang);
+        } catch (e) {
+          console.error('[Lang] switch failed:', e);
+        }
+      });
+    }
+
+    /* ---- DEV 按钮 ---- */
+    const devBtn = document.getElementById('btn-dev-console');
+    if (devBtn) {
+      devBtn.addEventListener('click', () => {
+        if (engine.devConsole) engine.devConsole.toggle();
+      });
+    }
+  } catch (err) {
+    showError('启动失败：无法加载依赖文件', err);
+    // 如果模块加载报错，直接弹窗
+    alert('启动崩溃：\n' + (err.stack || err.message || String(err)));
+  }
+})();
 })();
 </script>
 </body>
