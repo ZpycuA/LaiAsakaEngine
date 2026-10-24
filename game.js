@@ -545,30 +545,32 @@ _updateCouplingFX(p) {
   }
 }
 
-  _applyVisibility(){
-    const profile = this.engine.profile;
-    const els = this._els;
-    const p = this.world.player;
+ _applyVisibility(){
+  const profile = this.engine.profile;
+  const els = this._els;
+  const p = this.world.player;
 
-    // 血条
-    if (els.hpRow) {
-      const show = profile.get('hud.hpBar', true);
-      this._setDisplay('hpRow', show);
-    }
-    // 耦合条
-    if (els.cpRow) {
-      const show = (p && p.charSpec && p.charSpec.prazer) && profile.get('hud.cpBar', true);
-      this._setDisplay('cpRow', show);
-    }
-    // 弹药
-    if (els.ammoEl) {
-      this._setDisplay('ammoEl', profile.get('hud.ammoCounter', true));
-    }
-    // 任务列表
-    if (els.taskPanel) {
-      this._setDisplay('taskPanel', profile.get('hud.taskList', true));
-    }
+  // 血条、弹药、任务列表
+  if (els.hpRow) this._setDisplay('hpRow', profile.get('hud.hpBar', true));
+  if (els.ammoEl) this._setDisplay('ammoEl', profile.get('hud.ammoCounter', true));
+  if (els.taskPanel) this._setDisplay('taskPanel', profile.get('hud.taskList', true));
+
+  // 小地图
+  const mapEl = document.getElementById('minimap-container');
+  if (mapEl) mapEl.style.display = profile.get('visual.minimap', true) ? 'block' : 'none';
+
+  // 命中标记
+  const hitMarkerEl = document.getElementById('hit-marker');
+  if (hitMarkerEl && !profile.get('visual.hitMarkers', true)) {
+    hitMarkerEl.style.opacity = '0';
   }
+
+  // 耦合条
+  if (els.cpRow) {
+    const show = (p && p.charSpec && p.charSpec.prazer) && profile.get('hud.cpBar', true);
+    this._setDisplay('cpRow', show);
+  }
+}
 
   _setDisplay(key, show){
     const cacheKey = 'display:' + key;
