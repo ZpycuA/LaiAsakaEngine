@@ -1075,30 +1075,30 @@ _raycastBullet(owner, dirX, dirY, dirZ, baseEnergy, range, weaponDef, ammoDef, i
   }
 
   _damageEnemy(enemy, energy, pen){
-    if (!enemy.alive) return;
+  if (!enemy.alive) return;
 
-    const profile = this.engine.profile;
-    const isHead = Math.random() < 0.1;
-    let finalEnergy = isHead ? energy * COMBAT.HEAD_MULT : energy;
+  const profile = this.engine.profile;
+  const isHead = Math.random() < 0.1;
+  let finalEnergy = isHead ? energy * COMBAT.HEAD_MULT : energy;
 
-    // ★ [Profile] 爆头即死
-    if (isHead && profile.get('combat.headshotInstantKill', false)) {
-      finalEnergy = 999999;
-    }
-
-    const dmg = CombatSystem.energyToHP(finalEnergy, false);
-    enemy.hp -= dmg;
-    enemy.hitFlash = 0.15;
-    this.player.dealt += dmg;
-    this.stats.hits++;
-    if (isHead) this.stats.headshots++;
-
-    this._spawnDamageNumber(enemy.body.position.x, enemy.body.position.z, Math.round(dmg), 'enemy');
-    this._hitMarker();
-    this._playSFX('hit', { volume: 0.4 });
-
-    if (enemy.hp <= 0 && enemy.alive) this._killEnemy(enemy);
+  // ★ 修复：爆头即死时，伤害刚好等于敌人的剩余血量，不再用无限大
+  if (isHead && profile.get('combat.headshotInstantKill', false)) {
+    finalEnergy = enemy.maxHp * COMBAT.BODY_COEFF_HUMAN; 
   }
+
+  const dmg = CombatSystem.energyToHP(finalEnergy, false);
+  enemy.hp -= dmg;
+  enemy.hitFlash = 0.15;
+  this.player.dealt += dmg;
+  this.stats.hits++;
+  if (isHead) this.stats.headshots++;
+
+  this._spawnDamageNumber(enemy.body.position.x, enemy.body.position.z, Math.round(dmg), 'enemy');
+  this._hitMarker();
+  this._playSFX('hit', { volume: 0.4 });
+
+  if (enemy.hp <= 0 && enemy.alive) this._killEnemy(enemy);
+}
 
   _damagePlayer(player, energy, pen){
     if (!player.alive) return;
