@@ -1832,6 +1832,53 @@ export class GameApp {
       if (this.world) this.world.hud.update();
     }
   });
+  // ★ 陀螺仪设置事件绑定
+const gyroBtn = document.getElementById('btn-gyro-toggle');
+const gyroStatus = document.getElementById('gyro-status');
+const gyroSens = document.getElementById('gyro-sensitivity');
+const gyroSensVal = document.getElementById('gyro-sens-val');
+
+if (gyroBtn) {
+  gyroBtn.addEventListener('click', async () => {
+    if (e.input.gyroEnabled) {
+      // 关闭陀螺仪
+      e.input.gyroEnabled = false;
+      gyroStatus.textContent = '未开启';
+      gyroStatus.style.color = 'var(--dim2)';
+    } else {
+      // 尝试开启陀螺仪
+      try {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+          const state = await DeviceOrientationEvent.requestPermission();
+          if (state === 'granted') {
+            e.input.enableGyro();
+            gyroStatus.textContent = '已启用';
+            gyroStatus.style.color = 'var(--green)';
+          } else {
+            gyroStatus.textContent = '权限被拒绝';
+            gyroStatus.style.color = 'var(--danger)';
+          }
+        } else {
+          // 安卓通常直接开
+          e.input.enableGyro();
+          gyroStatus.textContent = '已启用';
+          gyroStatus.style.color = 'var(--green)';
+        }
+      } catch (err) {
+        console.error('陀螺仪启动失败', err);
+        gyroStatus.textContent = '不支持';
+      }
+    }
+  });
+}
+
+if (gyroSens) {
+  gyroSens.addEventListener('input', (ev) => {
+    const val = parseFloat(ev.target.value);
+    e.input.gyroSensitivity = val;
+    if (gyroSensVal) gyroSensVal.textContent = val.toFixed(1);
+  });
+}
 }
 
   _registerDevCommands(){
