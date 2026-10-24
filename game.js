@@ -1803,49 +1803,54 @@ export class GameApp {
     }
   }
 
-  _onMatchEnd(success, stats){
-    const e = this.engine;
-    const save = e.save;
-    const assessment = e.profile.assess();   // ★ [Profile] 结算时读实时难度
+    _onMatchEnd(success, stats){
+    try {
+      const e = this.engine;
+      const save = e.save;
+      const assessment = e.profile.assess();
 
-    save.data.stats = save.data.stats || { runs: 0, extracts: 0, deaths: 0, kills: 0 };
-    save.data.stats.runs++;
-    if (success) save.data.stats.extracts++;
-    else save.data.stats.deaths++;
-    save.data.stats.kills = (save.data.stats.kills || 0) + (stats.kills || 0);
+      save.data.stats = save.data.stats || { runs: 0, extracts: 0, deaths: 0, kills: 0 };
+      save.data.stats.runs++;
+      if (success) save.data.stats.extracts++;
+      else save.data.stats.deaths++;
+      save.data.stats.kills = (save.data.stats.kills || 0) + (stats.kills || 0);
 
-    // ★ [Profile] 奖励 × 难度系数
-    let baseReward = 0;
-    if (success) baseReward += 500;
-    baseReward += (stats.kills || 0) * 30;
-    baseReward += (stats.carriedValue || 0);
-    const finalReward = Math.round(baseReward * assessment.rewardMul);
+      let baseReward = 0;
+      if (success) baseReward += 500;
+      baseReward += (stats.kills || 0) * 30;
+      baseReward += (stats.carriedValue || 0);
+      const finalReward = Math.round(baseReward * assessment.rewardMul);
 
-    save.data.credits = (save.data.credits || 0) + finalReward;
-    save.save();
+      save.data.credits = (save.data.credits || 0) + finalReward;
+      save.save();
 
-    const title = document.getElementById('result-title');
-    const statsEl = document.getElementById('result-stats');
-    title.textContent = e.i18n.t(success ? 'ui.result.extract_success' : 'ui.result.operation_failed');
-    title.className = success ? 'success' : 'fail';
+      const title = document.getElementById('result-title');
+      const statsEl = document.getElementById('result-stats');
+      title.textContent = e.i18n.t(success ? 'ui.result.extract_success' : 'ui.result.operation_failed');
+      title.className = success ? 'success' : 'fail';
 
-    const statLines = [
-      `击杀：<b>${stats.kills}</b>　命中率：<b>${stats.accuracy}%</b>`,
-      `造成伤害：<b>${stats.dealt}</b>　承受伤害：<b>${stats.taken}</b>`,
-      `存活：<b>${stats.time}s</b>　携带物资：<b>${stats.carriedValue} cp</b>`,
-      `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(120,180,240,.2);color:var(--dim)">
-        难度：<b>${e.i18n.t(assessment.label)}</b> (${Math.round(assessment.score * 100)}/100)　奖励倍率：<b>×${assessment.rewardMul}</b>
-      </div>`,
-      `<div style="padding-top:8px;border-top:1px solid rgba(120,180,240,.2)">
-        本局奖励：<b style="color:var(--gold)">+${finalReward} cp</b>
-      </div>`,
-    ];
-    statsEl.innerHTML = statLines.join('<br>');
+      const statLines = [
+        `击杀：<b>${stats.kills}</b>　命中率：<b>${stats.accuracy}%</b>`,
+        `造成伤害：<b>${stats.dealt}</b>　承受伤害：<b>${stats.taken}</b>`,
+        `存活：<b>${stats.time}s</b>　携带物资：<b>${stats.carriedValue} cp</b>`,
+        `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(120,180,240,.2);color:var(--dim)">
+          难度：<b>${e.i18n.t(assessment.label)}</b> (${Math.round(assessment.score * 100)}/100)　奖励倍率：<b>×${assessment.rewardMul}</b>
+        </div>`,
+        `<div style="padding-top:8px;border-top:1px solid rgba(120,180,240,.2)">
+          本局奖励：<b style="color:var(--gold)">+${finalReward} cp</b>
+        </div>`,
+      ];
+      statsEl.innerHTML = statLines.join('<br>');
 
-    document.getElementById('result-screen').classList.add('on');
-    document.getElementById('pause-screen').classList.remove('on');
+      document.getElementById('result-screen').classList.add('on');
+      document.getElementById('pause-screen').classList.remove('on');
 
-    e.bus.emit('matchEnded', { success, stats, reward: finalReward, assessment });
+      e.bus.emit('matchEnded', { success, stats, reward: finalReward, assessment });
+    } catch (err) {
+      console.error('[GameApp] 结算出错:', err);
+      alert('结算出错，请返回菜单');
+      this._quitToMenu();
+    }
   }
 
   _togglePause(force){
@@ -1898,5 +1903,78 @@ export class GameApp {
       }
     }
     return ok;
+  }
+    _bindCameraControls() {
+    if (this._camBound) return;
+    this._camBound = true;
+    let isDragging = false;
+    let lastX = 0, lastY = 0;
+    const canvas = this.engine.renderer.canvas;
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 2) return;
+      isDragging = true;
+      lastX = e.clientX; lastY = e.clientY;
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      if (this.engine.cameraCtl) {
+        this.engine.cameraCtl.rotate(dx, dy);
+      }
+    });
+
+    window.addEventListener('pointerup', () => { isDragging = false; });
+  }
+
+  _renderCustomSettings(){
+    const el = document.getElementById('custom-settings');
+    if (!el) return;
+    
+    const options = [
+      { key: 'hud.hpBar', name: '显示血条' },
+      { key: 'hud.ammoCounter', name: '显示弹药' },
+      { key: 'visual.damageNumbers', name: '伤害数字' },
+      { key: 'visual.hitMarkers', name: '命中标记' },
+      { key: 'visual.minimap', name: '小地图' },
+      { key: 'skills.enabled', name: '开启技能' },
+      { key: 'combat.bulletDrop', name: '子弹下坠' },
+      { key: 'combat.headshotInstantKill', name: '爆头即死' },
+      { key: 'combat.realisticReload', name: '真实换弹' },
+      { key: 'combat.limbDamage', name: '四肢伤害' },
+    ];
+
+    el.innerHTML = '';
+    for (const opt of options) {
+      const label = document.createElement('label');
+      label.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;color:#cfe4f8;font-size:12px;padding:6px;background:rgba(20,32,46,.5);border-radius:6px;';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.dataset.key = opt.key;
+      checkbox.style.cssText = 'width:16px;height:16px;cursor:pointer;';
+      
+      checkbox.addEventListener('change', (e) => {
+        this.engine.profile.set(opt.key, e.target.checked);
+      });
+
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(opt.name));
+      el.appendChild(label);
+    }
+    this._syncCustomSettingsUI();
+  }
+
+  _syncCustomSettingsUI(){
+    const el = document.getElementById('custom-settings');
+    if (!el) return;
+    el.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      const key = cb.dataset.key;
+      const val = this.engine.profile.get(key, false);
+      cb.checked = val === true;
+    });
   }
 }
