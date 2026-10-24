@@ -21,7 +21,7 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font)}
-canvas{display:block;position:absolute;inset:0}
+canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
 
 .screen{position:absolute;inset:0;display:none;z-index:10}
 .screen.on{display:flex;align-items:center;justify-content:center;flex-direction:column}
@@ -210,6 +210,16 @@ canvas{display:block;position:absolute;inset:0}
 
     <h1 class="menu-title" data-i18n="ui.menu.title">Asaka Straight Project</h1>
     <p class="menu-sub" data-i18n="ui.menu.subtitle">LaiAsaka Engine</p>
+
+        <!-- 操作模式 -->
+    <div class="section">
+      <div class="section-label">操作模式</div>
+      <div class="options" id="platform-options">
+        <div class="option on" data-value="auto"><div class="opt-title">自动识别</div></div>
+        <div class="option" data-value="pc"><div class="opt-title">PC端 (键鼠)</div></div>
+        <div class="option" data-value="mobile"><div class="opt-title">移动端 (触屏)</div></div>
+      </div>
+    </div>
 
     <!-- 模式 -->
     <div class="section">
