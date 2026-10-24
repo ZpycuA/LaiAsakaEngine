@@ -820,20 +820,23 @@ _updatePlayer(dt){
   const e = this.engine;
   const mv = e.input.getMoveVector();
   
-  // --- 体力值系统 ---
+  // --- 硬核体力值系统 ---
   const isMoving = (mv.x !== 0 || mv.z !== 0);
-  const wantsToSprint = e.input.keys.has('shift') || e.input.isActive('sprint');
+  // 自动疾跑：摇杆推到底（magnitude > 0.9）或者按住Shift
+  const wantsToSprint = e.input.keys.has('shift') || e.input.isActive('sprint') || (e.input.joystickLeft && e.input.joystickLeft.vector.magnitude > 0.9);
+  
   let isSprinting = false;
   
-  if (isMoving && wantsToSprint && p.stamina > 0) {
+  if (isMoving && wantsToSprint && p.stamina > 5) {
     isSprinting = true;
-    p.stamina = Math.max(0, p.stamina - dt * 15); // 冲刺消耗体力
+    p.stamina = Math.max(0, p.stamina - dt * 12); // 冲刺每秒消耗 12 点
   } else {
-    p.stamina = Math.min(p.maxStamina, p.stamina + dt * 10); // 站定/慢走回复体力
+    const regen = isMoving ? 5 : 20; // 走路每秒恢复 5，站定每秒恢复 20
+    p.stamina = Math.min(p.maxStamina, p.stamina + dt * regen); 
   }
   
   const baseSpeed = p.charSpec.speed * (p.speedMul !== undefined ? p.speedMul : 1);
-  const speed = isSprinting ? baseSpeed * 1.6 : baseSpeed; // 冲刺速度加成
+  const speed = isSprinting ? baseSpeed * 1.8 : baseSpeed; 
 
   const forwardX = Math.sin(e.cameraCtl.yaw);
   const forwardZ = -Math.cos(e.cameraCtl.yaw);
@@ -845,8 +848,10 @@ _updatePlayer(dt){
 
   p.body.velocity.x = moveX * speed;
   p.body.velocity.z = moveZ * speed;
+  
   if (isMoving) p.body.wake();
 
+  // 跳跃
   const jumpPressed = e.input.keys.has(' ') || e.input.isActive('jump');
   if (jumpPressed && p.body.position.y <= p.body.radius + 0.2 && p.body.velocity.y <= 0.1) {
     p.body.velocity.y = 8.5; 
@@ -885,7 +890,6 @@ _updatePlayer(dt){
   p.body.position.x = Math.max(-half, Math.min(half, p.body.position.x));
   p.body.position.z = Math.max(-half, Math.min(half, p.body.position.z));
 }
-
 
   _updateProtection(dt){
     const p = this.player;
