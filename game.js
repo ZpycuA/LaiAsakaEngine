@@ -1918,22 +1918,29 @@ _syncMeshes(){
   resume(){ this.paused = false; }
 
   _end(success){
-    if (!this.running) return;
-    this.running = false;
-    this._processModeHook('onMatchEnd', success);
-    if (this.modeConfig && this.modeConfig.teardown) {
-      try { this.modeConfig.teardown(this); }
-      catch (e) { console.error('[Mode] teardown:', e); }
-    }
-    if (this.onEnd) this.onEnd(success, {
-      kills: this.player.kills,
-      accuracy: this.stats.shots > 0 ? Math.round(this.stats.hits / this.stats.shots * 100) : 0,
-      dealt: Math.round(this.player.dealt),
-      taken: Math.round(this.player.taken),
-      time: Math.round(this.time),
-      carriedValue: this.player.carriedValue,
-    });
+  if (!this.running) return;
+  this.running = false;
+  try { this._processModeHook('onMatchEnd', success); }
+  catch (e) { console.error('[Mode] onMatchEnd:', e); }
+  if (this.modeConfig && this.modeConfig.teardown) {
+    try { this.modeConfig.teardown(this); }
+    catch (e) { console.error('[Mode] teardown:', e); }
   }
+  if (this.onEnd) {
+    try {
+      this.onEnd(success, {
+        kills: this.player.kills,
+        accuracy: this.stats.shots > 0 ? Math.round(this.stats.hits / this.stats.shots * 100) : 0,
+        dealt: Math.round(this.player.dealt),
+        taken: Math.round(this.player.taken),
+        time: Math.round(this.time),
+        carriedValue: this.player.carriedValue,
+      });
+    } catch (e) {
+      console.error('[World._end] onEnd 回调异常：', e);
+    }
+  }
+}
 
   destroy(){
     this.running = false;
