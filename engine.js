@@ -917,13 +917,13 @@ class Renderer3D {
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setClearColor(0x080b10);
-    this.renderer.shadowMap.enabled = false;
+    this.renderer.shadowMap.enabled = true;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x080b10, 90, 180);
+    this.scene.fog = new THREE.Fog(0x080b10, 30, 80);
 
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 400);
-    this.camera.position.set(0, 80, 0);
+    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    this.camera.position.set(0, 20, 20);
     this.camera.lookAt(0, 0, 0);
 
     this._lightGroup = null;
@@ -946,6 +946,7 @@ class Renderer3D {
     this._lightGroup.add(ambient);
     const sun = new THREE.DirectionalLight(0xcfe6ff, 0.85);
     sun.position.set(30, 60, 30);
+    sun.castShadow = true;
     this._lightGroup.add(sun);
     const rim = new THREE.DirectionalLight(0xff9ec4, 0.35);
     rim.position.set(-40, 30, -20);
@@ -955,13 +956,7 @@ class Renderer3D {
   resize(){
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h, false);
-    const aspect = w / h;
-    const viewH = 70;
-    const viewW = viewH * aspect;
-    this.camera.left   = -viewW / 2;
-    this.camera.right  =  viewW / 2;
-    this.camera.top    =  viewH / 2;
-    this.camera.bottom = -viewH / 2;
+    this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
 
@@ -1213,51 +1208,47 @@ class SceneManager {
    ============================================================ */
 class CameraController {
   constructor(camera, opts){
-    opts = opts || {};
     this.camera = camera;
-    this.followSpeed = opts.followSpeed !== undefined ? opts.followSpeed : 0.15;
-    this.target = { x: 0, z: 0 };
-    this.baseY = opts.baseY !== undefined ? opts.baseY : camera.position.y;
+    this.yaw = 0;
+    this.pitch = 0.6;
+    this.distance = 20;
+    this.followSpeed = opts.followSpeed || 0.15;
+    this.target = { x: 0, y: 0, z: 0 };
     this.shakeIntensity = 0;
-    this.shakeDuration = 0;
     this.shakeTimer = 0;
     this.shakeOffset = { x: 0, z: 0 };
-    this.zoom = camera.zoom || 1;
-    this.targetZoom = this.zoom;
-    this.zoomSpeed = opts.zoomSpeed || 0.1;
   }
+  
   follow(x, z){ this.target.x = x; this.target.z = z; }
-  setZoom(z){ this.targetZoom = clamp(z, 0.3, 5); }
+  
+  rotate(dx, dy) {
+    this.yaw -= dx * 0.005;
+    this.pitch = clamp(this.pitch - dy * 0.005, 0.1, 1.4);
+  }
+
   shake(amount, duration){
     this.shakeIntensity = Math.max(this.shakeIntensity, amount || 0.5);
-    this.shakeDuration = Math.max(this.shakeDuration, duration || 0.2);
-    this.shakeTimer = Math.max(this.shakeTimer, this.shakeDuration);
+    this.shakeTimer = Math.max(this.shakeTimer, duration || 0.2);
   }
+
   update(dt){
-    // 跟随
-    this.camera.position.x = lerp(this.camera.position.x, this.target.x + this.shakeOffset.x, this.followSpeed);
-    this.camera.position.z = lerp(this.camera.position.z, this.target.z + this.shakeOffset.z, this.followSpeed);
-    // 缩放
-    if (Math.abs(this.camera.zoom - this.targetZoom) > 0.001) {
-      this.camera.zoom = lerp(this.camera.zoom, this.targetZoom, this.zoomSpeed);
-      this.camera.updateProjectionMatrix();
-    }
-    // 震屏
     if (this.shakeTimer > 0) {
-      const ratio = this.shakeTimer / this.shakeDuration;
-      const i = this.shakeIntensity * ratio;
+      const i = this.shakeIntensity * (this.shakeTimer / 0.2);
       this.shakeOffset.x = (Math.random() * 2 - 1) * i;
       this.shakeOffset.z = (Math.random() * 2 - 1) * i;
       this.shakeTimer -= dt;
-      if (this.shakeTimer <= 0) {
-        this.shakeOffset.x = 0;
-        this.shakeOffset.z = 0;
-        this.shakeIntensity = 0;
-        this.shakeDuration = 0;
-      }
+      if (this.shakeTimer <= 0) { this.shakeOffset.x = 0; this.shakeOffset.z = 0; }
     }
-    // 朝向
-    this.camera.lookAt(this.camera.position.x, 0, this.camera.position.z);
+
+    const ox = this.target.x + this.shakeOffset.x - Math.sin(this.yaw) * Math.cos(this.pitch) * this.distance;
+    const oz = this.target.z + this.shakeOffset.z + Math.cos(this.yaw) * Math.cos(this.pitch) * this.distance;
+    const oy = this.target.y + Math.sin(this.pitch) * this.distance;
+
+    this.camera.position.x = lerp(this.camera.position.x, ox, this.followSpeed);
+    this.camera.position.y = lerp(this.camera.position.y, oy, this.followSpeed);
+    this.camera.position.z = lerp(this.camera.position.z, oz, this.followSpeed);
+    
+    this.camera.lookAt(this.target.x, this.target.y + 1.5, this.target.z);
   }
 }
 
