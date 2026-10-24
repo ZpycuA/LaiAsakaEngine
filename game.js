@@ -400,7 +400,23 @@ class HUDSystem {
       p.auraMesh.visible = false;
     }
   }
+  // ★ 防护按钮可用性与显隐
+const protectGroup = document.getElementById('protect-group');
+if (protectGroup) {
+  if (p.charSpec && p.charSpec.prazer) {
+    protectGroup.style.display = 'flex'; // Prazer 显示
+  } else {
+    protectGroup.style.display = 'none'; // 人类彻底隐藏
+  }
+}
 
+if (this._protectBtns) {
+  const canProtect = p.charSpec && p.charSpec.prazer && p.coupling > 0;
+  for (const btn of this._protectBtns) {
+    if (canProtect) btn.classList.remove('dead');
+    else btn.classList.add('dead');
+  }
+}
   // 撤离进度
   this._renderExtractProgress();
 }
