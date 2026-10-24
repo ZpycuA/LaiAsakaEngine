@@ -605,6 +605,24 @@ class GameWorld {
     // ★ FPS模式隐藏玩家身体
     mesh.visible = false;
 
+    // ★ 耦合发光特效体（外描边）
+    let auraMesh = null;
+    if (spec.prazer) {
+      auraMesh = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.8, 1.6, 4, 12), // 稍微比人身体大一点
+        new THREE.MeshBasicMaterial({ 
+          color: 0xffffff, 
+          transparent: true, 
+          opacity: 0.5, 
+          side: THREE.BackSide, // 渲染背面，形成外发光感觉
+          depthWrite: false 
+        })
+      );
+      auraMesh.visible = false;
+      auraMesh.position.y = 1.2; // 对齐原模型高度
+      mesh.add(auraMesh); // 挂载到玩家模型上
+    }
+       
     const body = this.physics.add(new Body({
       x: 0, z: 0,
       radius: spec.radius || 1.2,
