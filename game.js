@@ -989,29 +989,28 @@ class GameWorld {
     this._playSFX('shot_' + def.cls, { volume: 0.6 });
   }
 
-  _raycastBullet(owner, angle, baseEnergy, range, weaponDef, ammoDef, isPlayer){
+    _raycastBullet(owner, dirX, dirZ, baseEnergy, range, weaponDef, ammoDef, isPlayer){
     const px = owner.body.position.x;
     const pz = owner.body.position.z;
-    const ox = px + Math.cos(angle) * 1.0;
-    const oz = pz + Math.sin(angle) * 1.0;
-    const dx = Math.cos(angle);
-    const dz = Math.sin(angle);
-
+    const ox = px + dirX * 1.0;
+    const oz = pz + dirZ * 1.0;
+    
+    // 过滤器
     const hitFilter = isPlayer
       ? (body) => body !== owner.body && (body.userData?.type === 'enemy' || body.userData?.type === 'obstacle')
       : (body) => body !== owner.body && (body.userData?.type === 'player' || body.userData?.type === 'obstacle');
 
-    const hit = this.physics.raycast(ox, 1.2, oz, dx, 0, dz, range, hitFilter);
+    const hit = this.physics.raycast(ox, 1.2, oz, dirX, 0, dirZ, range, hitFilter);
 
-    const endX = hit ? hit.point.x : ox + dx * range;
-    const endZ = hit ? hit.point.z : oz + dz * range;
+    const endX = hit ? hit.point.x : ox + dirX * range;
+    const endZ = hit ? hit.point.z : oz + dirZ * range;
+    
+    // 画出弹道
     this._spawnTracer(ox, oz, endX, endZ, isPlayer ? 0xffe08a : 0xff8b7b);
 
     if (!hit) return;
 
     const distance = hit.t;
-
-    // ★ [Profile] 子弹下坠
     const realisticDrop = this.engine.profile.get('combat.bulletDrop', false);
     const decayK = realisticDrop ? COMBAT.RANGE_DECAY_REALISTIC : COMBAT.RANGE_DECAY;
     const energy = CombatSystem.energyAtRange(baseEnergy, distance, range, decayK);
