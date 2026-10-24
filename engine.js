@@ -653,6 +653,7 @@ class InputSystem {
     this.joystickRight = null;
     this.enableVirtualJoysticks = false;
     this._touchStartPositions = new Map();
+    this.virtualActions = new Map();
   }
 
   registerAction(name, cfg){ this.actions.set(name, cfg || {}); return this; }
@@ -818,6 +819,25 @@ class InputSystem {
       this._touchStartPositions.delete(t.identifier);
     }
     e.preventDefault();
+  }
+
+    setActionState(name, active) {
+    this.virtualActions.set(name, active);
+  }
+
+  isActive(name){
+    if (this.virtualActions.has(name)) {
+      return this.virtualActions.get(name) === true;
+    }
+    const cfg = this.actions.get(name);
+    if (!cfg) return false;
+    if (cfg.keys) {
+      for (const k of cfg.keys) if (this.keys.has(k)) return true;
+    }
+    if (cfg.mouse === 'left'  && this.mouse.left)  return true;
+    if (cfg.mouse === 'right' && this.mouse.right) return true;
+    if (cfg.mouse === 'middle' && this.mouse.middle) return true;
+    return false;
   }
 }
 
