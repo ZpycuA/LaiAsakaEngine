@@ -1495,20 +1495,13 @@ _raycastBullet(owner, dirX, dirY, dirZ, baseEnergy, range, weaponDef, ammoDef, i
   }
 
   _hurtFX(){
-    const hud = document.getElementById('hud');
-    if (!hud) return;
-    const overlay = document.createElement('div');
-    overlay.style.cssText = `
-      position:absolute;inset:0;pointer-events:none;z-index:20;
-      background:radial-gradient(circle,transparent 30%,rgba(150,20,20,.6) 100%);
-      transition:opacity .15s;opacity:1;
-    `;
-    hud.appendChild(overlay);
-    setTimeout(() => {
-      overlay.style.opacity = '0';
-      setTimeout(() => overlay.remove(), 200);
-    }, 100);
-  }
+  const el = document.getElementById('fx-hit-flash');
+  if (!el) return;
+  el.style.opacity = '1';
+  setTimeout(() => {
+    el.style.opacity = '0';
+  }, 80);
+}
 
   _playSFX(name, opts){
     const audio = this.engine.audio;
