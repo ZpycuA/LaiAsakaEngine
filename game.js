@@ -1767,9 +1767,15 @@ export class GameApp {
     });
   }
 
-  startMatch(kind){
+    startMatch(kind){
     const e = this.engine;
     this._lastMatchKind = kind;
+
+    if ('ontouchstart' in window) {
+      e.input.enableVirtualJoysticks = true;
+    }
+
+    this._bindCameraControls();
 
     if (this.world) {
       try { this.world.destroy(); } catch (err) { console.warn(err); }
