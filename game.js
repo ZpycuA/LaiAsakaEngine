@@ -1210,61 +1210,46 @@ _updatePlayer(dt){
 }
 
 _raycastBullet(owner, ox, oy, oz, dirX, dirY, dirZ, baseEnergy, range, weaponDef, ammoDef, isPlayer){
-  // 1. 确定命中过滤器（只检测障碍物和敌对方）
   const hitFilter = isPlayer
     ? (body) => body !== owner.body && (body.userData?.type === 'enemy' || body.userData?.type === 'obstacle')
     : (body) => body !== owner.body && (body.userData?.type === 'player' || body.userData?.type === 'obstacle');
 
-  // 2. 将 3D 方向向量投影到 2D 平面，计算射线
   const lenXZ = Math.hypot(dirX, dirZ) || 1;
-  const hit = this.physics.raycast(ox, oy, oz, dirX / lenXZ, dirY, dirZ / lenXZ, range, hitFilter);
+  const hit = this.physics.raycast(ox, oy, oz, dirX/lenXZ, dirY, dirZ/lenXZ, range, hitFilter);
   
-  // 3. 计算真实的 3D 距离和终点
   const dist2D = hit ? hit.t : range;
-  const actualDist = dist2D / (lenXZ || 1); // 折算回 3D 真实距离
+  const actualDist = dist2D / (lenXZ || 1);
   const endX = ox + dirX * actualDist;
   const endY = oy + dirY * actualDist;
   const endZ = oz + dirZ * actualDist;
   
-  // 绘制弹道（现在支持 Y 轴高度）
   this._spawnTracer(ox, oy, oz, endX, endY, endZ, isPlayer ? 0xffe08a : 0xff8b7b);
 
-  // 4. 如果子弹打在地上
-  if (endY <= 0) {
-    this._spawnSpark(endX, 0.1, endZ);
-    return;
-  }
-
-  // 没打中任何实体
-  if (!hit) return;
-
-  // 5. 计算距离衰减后的伤害
   const realisticDrop = this.engine.profile.get('combat.bulletDrop', false);
   const decayK = realisticDrop ? COMBAT.RANGE_DECAY_REALISTIC : COMBAT.RANGE_DECAY;
   const energy = CombatSystem.energyAtRange(baseEnergy, actualDist, range, decayK);
   const pen = ammoDef.tier || 0;
 
-  // 6. 如果打中墙壁/障碍物
-  if (hit.body.userData.type === 'obstacle') {
-    this._spawnSpark(endX, endY, endZ);
+  // ★ 核心修复：优先判定是否打中敌人或玩家，避免因为子弹下坠高度变负而穿模
+  if (hit && hit.body.userData.type !== 'obstacle') {
+    const targetBody = hit.body;
+    // 假设敌人身体高度范围是 (position.y, position.y + 2.2)
+    // 如果命中点高度大于敌人胸口高度（position.y + 1.2），则算爆头
+    const isHeadshot = endY > (targetBody.position.y + 1.2) && endY < (targetBody.position.y + 2.5);
+
+    if (isPlayer && hit.body.userData.type === 'enemy') {
+      this._damageEnemy(hit.body.userData.ref, energy, pen, isHeadshot);
+    } else if (!isPlayer && hit.body.userData.type === 'player') {
+      this._damagePlayer(hit.body.userData.ref, energy, pen, isHeadshot);
+    }
     return;
   }
 
-  // 7. 命中实体判定（爆头计算）
-  const targetBody = hit.body;
-  // 简易爆头判定：目前模型半径约1.2，高2.4。命中高度 > 目标坐标 + 1.2 算作爆头
-  const isHeadshot = endY > (targetBody.position.y + 1.2);
-
-  if (isPlayer && hit.body.userData.type === 'enemy') {
-    // 打中敌人，传递 isHeadshot 参数
-    this._damageEnemy(hit.body.userData.ref, energy, pen, isHeadshot);
-  } else if (!isPlayer && hit.body.userData.type === 'player') {
-    // 玩家受击，记录受击方向（用于屏幕红弧线）
-    this.lastHitDir = Math.atan2(ox - targetBody.position.x, oz - targetBody.position.z);
-    this.lastHitTime = this.time;
-    
-    // 打中玩家，传递 isHeadshot 参数
-    this._damagePlayer(hit.body.userData.ref, energy, pen, isHeadshot);
+  // 没打到人，才判定是否打在地上或障碍物上
+  if (endY <= 0) {
+    this._spawnSpark(endX, 0.1, endZ);
+  } else if (hit && hit.body.userData.type === 'obstacle') {
+    this._spawnSpark(endX, endY, endZ);
   }
 }
 
