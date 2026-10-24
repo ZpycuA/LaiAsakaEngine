@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { Body } from './engine.js';
+import { CombatLog, showCombatReport, hideCombatReport } from './combatlog.js';
 
 /* ============================================================
    [0] 战斗公式常数
@@ -667,7 +668,9 @@ class GameWorld {
 
   this.tasks = new TaskSystem(this);
   this.hud = new HUDSystem(this);
-  this.damageLog = []; // 确保之前加入的伤害日志数组也在这里初始化
+  this.combatLog = new CombatLog();
+  this.lastHitDir = 0;
+  this.lastHitTime = -10;
 }
 
   start(){
