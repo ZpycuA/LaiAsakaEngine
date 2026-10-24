@@ -644,6 +644,7 @@ class InputSystem {
   constructor(){
     this.keys = new Set();
     this.mouse = { x: 0, y: 0, left: false, right: false, middle: false };
+    // 严格区分左摇杆和右视角的 touch 状态
     this.touch = { left: null, right: null };
     this.actions = new Map();
     this.axes = new Map();
@@ -651,11 +652,7 @@ class InputSystem {
     this._canvas = null;
     this.joystickLeft = null;
     this.enableVirtualJoysticks = false;
-    this._touchStartPositions = new Map();
     this.virtualActions = new Map();
-    // 视角拖拽逻辑
-    this.dragTouchId = null;
-    this.dragLastPos = { x: 0, y: 0 };
   }
 
   registerAction(name, cfg){ this.actions.set(name, cfg || {}); return this; }
@@ -682,6 +679,7 @@ class InputSystem {
     if (this.keys.has('s') || this.keys.has('arrowdown'))  mz += 1;
     if (this.keys.has('a') || this.keys.has('arrowleft'))  mx -= 1;
     if (this.keys.has('d') || this.keys.has('arrowright')) mx += 1;
+    
     if (this.joystickLeft && this.joystickLeft.visible) {
       const v = this.joystickLeft.vector;
       mx = v.x;
@@ -701,39 +699,7 @@ class InputSystem {
     return { x: mx, z: mz };
   }
 
-  // 处理屏幕拖拽（弃用旧版，由 game.js 统一接管）
-  attach(canvas){
-    if (this._bound) return;
-    this._bound = true;
-    this._canvas = canvas;
-
-    window.addEventListener('keydown', e => {
-      const k = e.key.toLowerCase();
-      this.keys.add(k);
-      if ([' ', 'tab', 'escape', 'shift'].includes(k)) e.preventDefault();
-    });
-    window.addEventListener('keyup', e => this.keys.delete(e.key.toLowerCase()));
-    window.addEventListener('blur', () => this.keys.clear());
-
-    // 鼠标控制
-    canvas.addEventListener('mousemove', e => {
-      this.mouse.x = e.clientX;
-      this.mouse.y = e.clientY;
-    });
-    canvas.addEventListener('mousedown', e => {
-      if (e.button === 0) this.mouse.left = true;
-      if (e.button === 1) this.mouse.middle = true;
-      if (e.button === 2) this.mouse.right = true;
-    });
-    window.addEventListener('mouseup', e => {
-      if (e.button === 0) this.mouse.left = false;
-      if (e.button === 1) this.mouse.middle = false;
-      if (e.button === 2) this.mouse.right = false;
-    });
-    canvas.addEventListener('contextmenu', e => e.preventDefault());
-  }
-
-  // 虚拟摇杆的左下角处理（由 game.js 的 UI 层调用）
+  // 左摇杆
   startLeftStick(x, y, id) {
     this.touch.left = { id, ox: x, oy: y, x, y };
     if (this.enableVirtualJoysticks) {
@@ -752,7 +718,47 @@ class InputSystem {
     this.touch.left = null;
     if (this.joystickLeft) this.joystickLeft.hide();
   }
+
+  // 右视角拖拽
+  startRightDrag(x, y, id) {
+    if (this.touch.right) return; // 如果已经有手指在转视角，忽略第二根
+    this.touch.right = { id, ox: x, oy: y, x, y };
+  }
+  moveRightDrag(x, y) {
+    if (!this.touch.right) return null;
+    const dx = x - this.touch.right.x;
+    const dy = y - this.touch.right.y;
+    this.touch.right.x = x;
+    this.touch.right.y = y;
+    return { dx, dy };
+  }
+  endRightDrag() { this.touch.right = null; }
+
+  attach(canvas){
+    if (this._bound) return;
+    this._bound = true;
+    this._canvas = canvas;
+
+    window.addEventListener('keydown', e => {
+      const k = e.key.toLowerCase();
+      this.keys.add(k);
+      if ([' ', 'tab', 'escape', 'shift'].includes(k)) e.preventDefault();
+    });
+    window.addEventListener('keyup', e => this.keys.delete(e.key.toLowerCase()));
+    window.addEventListener('blur', () => this.keys.clear());
+
+    canvas.addEventListener('mousedown', e => {
+      if (e.button === 0) this.mouse.left = true;
+      if (e.button === 2) this.mouse.right = true;
+    });
+    window.addEventListener('mouseup', e => {
+      if (e.button === 0) this.mouse.left = false;
+      if (e.button === 2) this.mouse.right = false;
+    });
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+  }
 }
+      
 
 /* ============================================================
    [10] PerformanceMonitor
