@@ -1479,7 +1479,17 @@ _damageEnemy(enemy, energy, pen, isHead = false){
   if (enemy.mesh) enemy.mesh.visible = false;
   this.player.kills++;
   this.stats.kills++;
-
+  this.combatLog.push({
+  type: 'kill',
+  t: this.time,
+  target: {
+    name: this.engine.i18n.t(enemy.spec.name),
+    isBoss: false,
+    isElite: false,
+  },
+  distance: dist,
+  damageContributed: dmg,
+});
   this._spawnSpark(enemy.body.position.x, enemy.body.position.z);
   this.tasks.progress('kill', 1, { faction: enemy.spec.faction });
   this._processModeHook('onEnemyKilled', enemy);
