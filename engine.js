@@ -759,9 +759,13 @@ class InputSystem {
     canvas.addEventListener('touchcancel',e => this._onTouchEnd(e),   { passive: false });
   }
 
-  _onTouchStart(e){
+    _onTouchStart(e){
     for (const t of e.changedTouches) {
       const x = t.clientX, y = t.clientY;
+      const el = document.elementFromPoint(x, y);
+      // 如果摸到了按钮，就不生成摇杆
+      if (el && (el.closest('#mobile-controls') || el.closest('button'))) continue;
+
       const isLeftSide = x < window.innerWidth * 0.45;
       if (isLeftSide && !this.touch.left) {
         this.touch.left = { id: t.identifier, ox: x, oy: y, x, y };
