@@ -809,7 +809,7 @@ class GameWorld {
     const baseSpeed = p.charSpec.speed * (p.speedMul !== undefined ? p.speedMul : 1);
     const isSprinting = e.input.keys.has('shift') || e.input.keys.has('shiftleft');
     
-    // 使用相机朝向移动（第一人称逻辑）
+    // 第一人称移动
     const forwardX = Math.sin(e.cameraCtl.yaw);
     const forwardZ = -Math.cos(e.cameraCtl.yaw);
     const rightX = Math.cos(e.cameraCtl.yaw);
@@ -822,13 +822,13 @@ class GameWorld {
     p.body.velocity.x = moveX * speed;
     p.body.velocity.z = moveZ * speed;
 
-    // 跳跃
+    // 跳跃保护
     const jumpPressed = e.input.keys.has(' ') || e.input.isActive('jump');
     if (jumpPressed && p.body.position.y <= p.body.radius + 0.1) {
       p.body.velocity.y = 12;
     }
 
-    // 玩家永远面朝相机正前方
+    // 角色永远面朝相机前方
     p.angle = e.cameraCtl.yaw;
 
     this._updateProtection(dt);
