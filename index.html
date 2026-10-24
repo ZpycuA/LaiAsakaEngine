@@ -353,6 +353,18 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
       </button>
     </div>
 
+    <!-- 受伤/状态滤镜层 -->
+<div id="fx-filter" style="position:absolute;inset:0;pointer-events:none;z-index:10;transition:all 0.2s;backdrop-filter:none;"></div>
+
+<!-- 电子纹样/受伤噪点层 -->
+<div id="fx-vignette" style="position:absolute;inset:0;pointer-events:none;z-index:11;opacity:0;background:radial-gradient(circle, transparent 40%, rgba(200,0,0,0.6) 100%);transition:opacity 0.5s;"></div>
+
+<!-- 耦合边缘光芒层 -->
+<div id="fx-coupling" style="position:absolute;inset:0;pointer-events:none;z-index:12;box-shadow:none;transition:box-shadow 0.3s, background 0.3s;"></div>
+
+<!-- 受伤红屏闪烁层 -->
+<div id="fx-hit-flash" style="position:absolute;inset:0;pointer-events:none;z-index:13;background:rgba(255,0,0,0.4);opacity:0;transition:opacity 0.1s;"></div>
+
     <!-- 撤离进度 -->
     <div id="extract-progress">
       <div class="progress-label" data-i18n="ui.game.extract_progress">撤 离 中</div>
