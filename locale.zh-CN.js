@@ -100,4 +100,11 @@ export default {
   'profile.tier.tactical': '战术',
   'profile.tier.hardcore': '硬核',
   'profile.tier.simulation': '拟真',
+  'combatlog.title': '战斗记录',
+  'combatlog.filter.all': '全部',
+  'combatlog.filter.dealt': '造成',
+  'combatlog.filter.taken': '承受',
+  'combatlog.filter.items': '物品',
+  'combatlog.filter.skills': '技能',
+  'combatlog.empty': '无战斗记录',
 };
