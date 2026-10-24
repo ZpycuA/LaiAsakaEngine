@@ -1976,43 +1976,65 @@ export class GameApp {
     window.addEventListener('contextmenu', e => e.preventDefault());
   }
 
-  _renderCustomSettings(){
-    const el = document.getElementById('custom-settings');
-    if (!el) return;
-    
-    const options = [
-      { key: 'hud.hpBar', name: '显示血条' },
-      { key: 'hud.ammoCounter', name: '显示弹药' },
-      { key: 'visual.damageNumbers', name: '伤害数字' },
-      { key: 'visual.hitMarkers', name: '命中标记' },
-      { key: 'visual.minimap', name: '小地图' },
-      { key: 'skills.enabled', name: '开启技能' },
-      { key: 'combat.bulletDrop', name: '子弹下坠' },
-      { key: 'combat.headshotInstantKill', name: '爆头即死' },
-      { key: 'combat.realisticReload', name: '真实换弹' },
-      { key: 'combat.limbDamage', name: '四肢伤害' },
-    ];
+ _renderCustomSettings(){
+  const el = document.getElementById('custom-settings');
+  if (!el) return;
+  
+  const options = [
+    { key: 'hud.hpBar', name: '显示血条', type: 'checkbox' },
+    { key: 'hud.ammoCounter', name: '显示弹药', type: 'checkbox' },
+    { key: 'visual.damageNumbers', name: '伤害数字', type: 'checkbox' },
+    { key: 'visual.hitMarkers', name: '命中标记', type: 'checkbox' },
+    { key: 'visual.minimap', name: '小地图', type: 'checkbox' },
+    { key: 'skills.enabled', name: '开启技能', type: 'checkbox' },
+    { key: 'combat.bulletDrop', name: '子弹下坠', type: 'checkbox' },
+    { key: 'combat.headshotInstantKill', name: '爆头即死', type: 'checkbox' },
+    { key: 'combat.realisticReload', name: '真实换弹', type: 'checkbox' },
+    { key: 'combat.limbDamage', name: '四肢伤害', type: 'checkbox' },
+    // ★ 新增灵敏度滑块
+    { key: 'input.sensitivity', name: '视角灵敏度', type: 'range', min: 0.5, max: 3.0, step: 0.1 }
+  ];
 
-    el.innerHTML = '';
-    for (const opt of options) {
-      const label = document.createElement('label');
-      label.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;color:#cfe4f8;font-size:12px;padding:6px;background:rgba(20,32,46,.5);border-radius:6px;';
-      
+  el.innerHTML = '';
+  for (const opt of options) {
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;color:#cfe4f8;font-size:12px;padding:6px;background:rgba(20,32,46,.5);border-radius:6px;';
+    
+    if (opt.type === 'checkbox') {
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.dataset.key = opt.key;
       checkbox.style.cssText = 'width:16px;height:16px;cursor:pointer;';
-      
       checkbox.addEventListener('change', (e) => {
         this.engine.profile.set(opt.key, e.target.checked);
+        if (opt.key === 'input.sensitivity') {
+          this.engine.cameraCtl.sensitivity = e.target.value;
+        }
       });
-
       label.appendChild(checkbox);
-      label.appendChild(document.createTextNode(opt.name));
-      el.appendChild(label);
+    } else if (opt.type === 'range') {
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = opt.min;
+      slider.max = opt.max;
+      slider.step = opt.step;
+      slider.dataset.key = opt.key;
+      slider.style.cssText = 'flex:1;cursor:pointer;';
+      slider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        this.engine.profile.set(opt.key, val);
+        if (opt.key === 'input.sensitivity') {
+          this.engine.cameraCtl.sensitivity = val;
+        }
+      });
+      label.appendChild(slider);
     }
-    this._syncCustomSettingsUI();
+    
+    label.appendChild(document.createTextNode(opt.name));
+    el.appendChild(label);
   }
+  this._syncCustomSettingsUI();
+}
 
   _syncCustomSettingsUI(){
     const el = document.getElementById('custom-settings');
