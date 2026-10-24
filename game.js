@@ -791,13 +791,13 @@ class GameWorld {
     }
   }
 
-      _updatePlayer(dt){
+    _updatePlayer(dt){
     const p = this.player;
     if (!p || !p.alive) return;
 
     const e = this.engine;
 
-    // ★ 处理移动端右摇杆转视角
+    // 处理移动端右摇杆转视角
     if (e.input.joystickRight && e.input.joystickRight.visible) {
       const v = e.input.joystickRight.vector;
       if (v.magnitude > 0.1) {
@@ -805,29 +805,30 @@ class GameWorld {
       }
     }
 
-    // 移动方向基于相机朝向
     const mv = e.input.getMoveVector();
     const baseSpeed = p.charSpec.speed * (p.speedMul !== undefined ? p.speedMul : 1);
     const isSprinting = e.input.keys.has('shift') || e.input.keys.has('shiftleft');
     
-    const camForward = new THREE.Vector3();
-    e.renderer.camera.getWorldDirection(camForward);
-    camForward.y = 0; camForward.normalize();
-    const camRight = new THREE.Vector3().crossVectors(camForward, new THREE.Vector3(0, 1, 0)).normalize();
+    // 使用相机朝向移动（第一人称逻辑）
+    const forwardX = Math.sin(e.cameraCtl.yaw);
+    const forwardZ = -Math.cos(e.cameraCtl.yaw);
+    const rightX = Math.cos(e.cameraCtl.yaw);
+    const rightZ = Math.sin(e.cameraCtl.yaw);
 
-    let moveX = camRight.x * mv.x + camForward.x * -mv.z;
-    let moveZ = camRight.z * mv.x + camForward.z * -mv.z;
+    let moveX = rightX * mv.x + forwardX * -mv.z;
+    let moveZ = rightZ * mv.x + forwardZ * -mv.z;
 
     const speed = isSprinting ? baseSpeed * 1.5 : baseSpeed;
     p.body.velocity.x = moveX * speed;
     p.body.velocity.z = moveZ * speed;
 
     // 跳跃
-    if (e.input.keys.has(' ') && p.body.position.y <= p.body.radius + 0.1) {
+    const jumpPressed = e.input.keys.has(' ') || e.input.isActive('jump');
+    if (jumpPressed && p.body.position.y <= p.body.radius + 0.1) {
       p.body.velocity.y = 12;
     }
 
-    // 角色面朝相机前方
+    // 玩家永远面朝相机正前方
     p.angle = e.cameraCtl.yaw;
 
     this._updateProtection(dt);
