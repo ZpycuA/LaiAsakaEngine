@@ -2,22 +2,11 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
 <title>LaiAsaka Engine · Asaka Straight Project</title>
 <style>
-html, body {
-  touch-action: none; /* 禁用浏览器默认的滑动和缩放 */
-  -webkit-user-select: none;
-  user-select: none;
-  overflow: hidden;
-}
-canvas {
-  touch-action: none;
-}
 /* ============================================================
-   LaiAsaka Engine v3.0.0 · 全局样式
-   © 2026 ZpycuA · CC BY-NC 4.0
-   所有文案由 data-i18n 属性驱动，由 I18nSystem 应用。
+   LaiAsaka Engine v3.1.0 · 全局样式
    ============================================================ */
 :root{
   --bg:#05070a;--bg2:#0a1018;
@@ -28,9 +17,14 @@ canvas {
   --mono:ui-monospace,Menlo,Consolas,monospace;
   --font:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
 }
+
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font)}
-canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
+html, body { 
+  width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);
+  touch-action: none; /* 禁用浏览器默认的滑动和缩放 */
+  -webkit-user-select: none;
+}
+canvas{display:block;position:absolute;inset:0;touch-action:none}
 
 .screen{position:absolute;inset:0;display:none;z-index:10}
 .screen.on{display:flex;align-items:center;justify-content:center;flex-direction:column}
@@ -47,6 +41,9 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
 .boot-status{font-size:10.5px;color:var(--dim);letter-spacing:2px;font-family:var(--mono);min-height:16px}
 .boot-copyright{font-size:10px;color:var(--dim2);letter-spacing:1px;line-height:1.9;font-family:var(--mono)}
 .boot-copyright b{color:var(--accent)}
+#boot-error{max-width:520px;text-align:left;font-family:var(--mono);font-size:11px;line-height:1.7;color:#ff8b8b;padding:14px;border:1px solid rgba(255,100,100,.35);border-radius:8px;background:rgba(80,20,20,.35);display:none;white-space:pre-wrap;word-break:break-word}
+#boot-error.on{display:block}
+#boot-error b{color:var(--gold)}
 
 /* ---------- Menu ---------- */
 #menu-screen{background:radial-gradient(circle at 50% 20%,#0f1a28 0%,#05070a 78%);overflow-y:auto;z-index:50;align-items:stretch;justify-content:flex-start}
@@ -73,30 +70,45 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
 .btn.primary{background:linear-gradient(180deg,rgba(140,110,40,.6),rgba(70,50,15,.8));border-color:rgba(255,210,90,.55);color:#ffe8a8}
 .btn:active{transform:scale(.985)}
 .btn.ghost{background:rgba(20,32,46,.5);border-color:var(--line2);color:var(--dim);font-size:12px;padding:10px}
-.btn.danger{background:rgba(80,30,30,.5);border-color:rgba(255,100,100,.35);color:#ff9f9f;font-size:12px;padding:10px}
 
-/* ---------- Game ---------- */
+/* ---------- Game UI ---------- */
 #game-screen{z-index:20;display:none}
 #game-screen.on{display:block}
 #game-canvas{position:absolute;inset:0}
 #hud{position:absolute;inset:0;pointer-events:none;z-index:30}
 
-#crosshair{position:absolute;left:50%;top:50%;width:20px;height:20px;transform:translate(-50%,-50%);pointer-events:none}
-#crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(200,230,255,.85);box-shadow:0 0 4px rgba(120,200,255,.8)}
-#crosshair::before{left:0;top:9px;width:7px;height:1.5px}
-#crosshair::after{right:0;top:9px;width:7px;height:1.5px}
-#crosshair .v1,#crosshair .v2{position:absolute;background:rgba(200,230,255,.85)}
-#crosshair .v1{left:9px;top:0;width:1.5px;height:7px}
-#crosshair .v2{left:9px;bottom:0;width:1.5px;height:7px}
+/* 特效层 */
+#fx-filter { position:absolute; inset:0; pointer-events:none; z-index:10; transition:all 0.2s; backdrop-filter:none; }
+#fx-vignette { position:absolute; inset:0; pointer-events:none; z-index:11; opacity:0; background:radial-gradient(circle, transparent 40%, rgba(200,0,0,0.6) 100%); transition:opacity 0.3s; }
+#fx-coupling { position:absolute; inset:0; pointer-events:none; z-index:12; box-shadow:none; transition:box-shadow 0.3s, background 0.3s; }
+#fx-hit-flash { position:absolute; inset:0; pointer-events:none; z-index:13; background:rgba(255,0,0,0.15); opacity:0; transition:opacity 0.1s; }
 
+/* 伤害方向指示器 */
+#dmg-indicator { position:absolute; inset:0; pointer-events:none; z-index:15; }
+
+/* 准星 */
+#crosshair { position:absolute; left:50%; top:50%; width:24px; height:24px; transform:translate(-50%,-50%); pointer-events:none; z-index:20; }
+#crosshair .line-h { position:absolute; top:11px; width:6px; height:2px; background:#fff; box-shadow:0 0 2px #000; }
+#crosshair .line-v { position:absolute; left:11px; width:2px; height:6px; background:#fff; box-shadow:0 0 2px #000; }
+#hit-marker { position:absolute; inset:0; opacity:0; transition:opacity 0.1s; }
+
+/* 小地图 */
+#minimap-container { position:absolute; right:12px; top:12px; width:150px; height:150px; border-radius:8px; overflow:hidden; border:2px solid rgba(100,160,220,.4); background:rgba(10,18,28,.8); z-index:25; box-shadow:0 4px 10px rgba(0,0,0,0.5); display:none; }
+#minimap { width:100%; height:100%; }
+
+/* 击杀播报 */
+#kill-feed { position:absolute; right:16px; bottom:120px; display:flex; flex-direction:column; align-items:flex-end; gap:4px; z-index:25; pointer-events:none; font-size:12px; color:#fff; text-shadow:0 1px 3px #000; }
+@keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* 左上任务面板 */
 #top-left{position:absolute;left:12px;top:12px;pointer-events:auto}
 .task-panel{padding:10px 14px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);min-width:220px;max-width:300px}
 .panel-title{font-size:10.5px;color:var(--accent);letter-spacing:3px;margin-bottom:6px;font-weight:700}
 .task-item{font-size:10.5px;line-height:1.7;color:#cfe4f8}
 .task-item.done{color:var(--green);text-decoration:line-through;opacity:.7}
 .task-item .prog{color:var(--gold)}
-.task-item .source-tag{font-size:8.5px;color:var(--dim2);margin-left:4px}
 
+/* 左下玩家面板 */
 #bottom-left{position:absolute;left:12px;bottom:12px;pointer-events:auto}
 .player-panel{padding:10px 14px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);min-width:240px}
 .player-name{font-size:12px;font-weight:700;color:#cfe6ff;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
@@ -108,12 +120,13 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
 .bar.cp > div{background:linear-gradient(90deg,#3fa8ff,#8ee7ff)}
 .bar > span{position:absolute;inset:0;text-align:center;font-size:8.5px;line-height:11px;color:#fff;font-weight:600;text-shadow:0 1px 2px #000}
 
+/* 右下武器区 */
 #bottom-right{position:absolute;right:16px;bottom:16px;text-align:right;text-shadow:0 2px 8px #000;pointer-events:none}
 .weapon-name{font-size:11px;color:var(--dim);letter-spacing:2px}
 .ammo-text{font-size:32px;font-weight:800;font-family:var(--mono);color:#eaf4ff;line-height:1;margin-top:2px}
 .ammo-text > span:last-child{font-size:16px;color:var(--dim2);font-weight:500}
 
-/* 耦合防护 L1/L2/L3 */
+/* 防护按钮 */
 #protect-group{position:absolute;left:12px;bottom:180px;display:flex;flex-direction:column;gap:6px;pointer-events:auto}
 .protect-btn{width:60px;padding:8px 2px;border-radius:8px;text-align:center;font-size:11px;font-weight:700;border:1.5px solid;background:rgba(0,0,0,.5);cursor:pointer;font-family:inherit;transition:.12s;color:#fff}
 .protect-btn .lv{font-size:12px;letter-spacing:1px}
@@ -131,13 +144,11 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
 .progress-bar{width:260px;height:8px;background:rgba(0,0,0,.7);border-radius:4px;overflow:hidden;border:1px solid rgba(120,220,255,.4)}
 #extract-fill{height:100%;width:0%;background:linear-gradient(90deg,#3fd0ff,#a2f0ff);transition:width .1s}
 
-#event-banner{position:absolute;left:50%;top:30%;transform:translateX(-50%);padding:10px 28px;border-radius:8px;background:linear-gradient(90deg,rgba(120,60,200,.9),rgba(60,90,200,.9));border:1px solid rgba(180,150,255,.7);color:#f0e8ff;font-size:14px;font-weight:700;letter-spacing:5px;display:none}
-#event-banner.on{display:block}
-
+/* 暂停按钮 */
 #pause-btn{position:absolute;right:12px;top:160px;width:42px;height:42px;border-radius:50%;background:var(--panel);border:1px solid var(--line);color:var(--dim);font-size:14px;z-index:8;cursor:pointer;pointer-events:auto}
 #pause-btn:hover{color:var(--accent)}
 
-/* ---------- Overlay (暂停/结算) ---------- */
+/* ---------- Overlay ---------- */
 .overlay{position:absolute;inset:0;background:rgba(4,8,14,.9);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:60;padding:24px;text-align:center}
 .overlay.on{display:flex}
 .overlay h2{font-size:26px;letter-spacing:10px;margin-bottom:20px;color:var(--accent)}
@@ -166,14 +177,8 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
 .dc-prompt{color:var(--accent);font-weight:700;font-size:14px}
 #dc-input{flex:1;background:transparent;border:none;outline:none;color:#e8f4ff;font-family:inherit;font-size:13px;padding:4px 0;user-select:text}
 
-/* ---------- Copyright ---------- */
 .copyright-bar{position:fixed;right:10px;bottom:8px;font-size:9px;color:rgba(92,130,168,.45);letter-spacing:1.5px;font-family:var(--mono);z-index:200;pointer-events:none;text-align:right;line-height:1.5}
 .copyright-bar b{color:rgba(127,208,255,.55)}
-
-/* ---------- 错误提示 ---------- */
-#boot-error{max-width:520px;text-align:left;font-family:var(--mono);font-size:11px;line-height:1.7;color:#ff8b8b;padding:14px;border:1px solid rgba(255,100,100,.35);border-radius:8px;background:rgba(80,20,20,.35);display:none;white-space:pre-wrap;word-break:break-word}
-#boot-error.on{display:block}
-#boot-error b{color:var(--gold)}
 
 @media(max-width:640px){
   .boot-title{font-size:24px;letter-spacing:5px}
@@ -182,6 +187,7 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
   .player-panel{min-width:200px}
   #protect-group{bottom:160px}
   .protect-btn{width:52px}
+  #minimap-container{width:100px;height:100px}
 }
 </style>
 </head>
@@ -220,7 +226,7 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
     <h1 class="menu-title" data-i18n="ui.menu.title">Asaka Straight Project</h1>
     <p class="menu-sub" data-i18n="ui.menu.subtitle">LaiAsaka Engine</p>
 
-        <!-- 操作模式 -->
+    <!-- 操作模式 -->
     <div class="section">
       <div class="section-label">操作模式</div>
       <div class="options" id="platform-options">
@@ -229,54 +235,28 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
         <div class="option" data-value="mobile"><div class="opt-title">移动端 (触屏)</div></div>
       </div>
     </div>
-<!-- 陀螺仪设置 -->
-<div class="section">
-  <div class="section-label">
-    <span>陀螺仪设置</span>
-    <span class="hint">仅移动端生效</span>
-  </div>
-  <div style="display:flex;flex-direction:column;gap:8px;padding:8px;background:var(--panel);border-radius:10px;border:1px solid var(--line2);">
-    <div class="opt" id="btn-gyro-toggle" style="padding:10px 14px;text-align:left;display:flex;justify-content:space-between;align-items:center;">
-      <span>启用陀螺仪视角</span>
-      <span id="gyro-status" style="color:var(--dim2);font-size:11px;">未开启</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:12px;padding:0 14px;">
-      <span style="font-size:11px;color:var(--dim);">灵敏度</span>
-      <input type="range" id="gyro-sensitivity" min="0.1" max="3.0" step="0.1" value="1.0" style="flex:1;cursor:pointer;">
-      <span id="gyro-sens-val" style="font-size:11px;color:var(--accent);width:26px;text-align:right;">1.0</span>
-    </div>
-  </div>
-</div>
+
     <!-- 模式 -->
     <div class="section">
-      <div class="section-label">
-        <span data-i18n="ui.menu.section_mode">模式</span>
-        <span class="hint" id="mode-hint"></span>
-      </div>
+      <div class="section-label"><span data-i18n="ui.menu.section_mode">模式</span><span class="hint" id="mode-hint"></span></div>
       <div class="options" id="mode-options"></div>
     </div>
 
     <!-- 地图 -->
     <div class="section">
-      <div class="section-label">
-        <span data-i18n="ui.menu.section_map">地图</span>
-      </div>
+      <div class="section-label"><span data-i18n="ui.menu.section_map">地图</span></div>
       <div class="options" id="map-options"></div>
     </div>
 
     <!-- 难度 -->
     <div class="section">
-      <div class="section-label">
-        <span data-i18n="ui.menu.section_difficulty">难度</span>
-      </div>
+      <div class="section-label"><span data-i18n="ui.menu.section_difficulty">难度</span></div>
       <div class="options" id="diff-options"></div>
     </div>
 
     <!-- 角色 -->
     <div class="section">
-      <div class="section-label">
-        <span data-i18n="ui.menu.section_character">角色</span>
-      </div>
+      <div class="section-label"><span data-i18n="ui.menu.section_character">角色</span></div>
       <div class="options" id="char-options"></div>
     </div>
 
@@ -287,19 +267,38 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
         <span class="hint" data-i18n="ui.menu.profile_hint">仿真 ↔ 游戏性</span>
       </div>
       <div class="options" id="profile-options"></div>
-           <!-- 自定义细节设置 -->
-    <div class="section">
-      <div class="section-label">
-        <span>自定义细节</span>
-      </div>
-      <div id="custom-settings" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:4px;"></div>
     </div>
-    </div>
+
     <!-- 实时难度显示 -->
     <div id="difficulty-display" style="margin:12px 0;padding:12px 16px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;font-size:12px;display:flex;justify-content:space-between;align-items:center;min-height:52px">
       <span style="color:var(--dim)">—</span>
     </div>
-     
+
+    <!-- 自定义细节 -->
+    <div class="section">
+      <div class="section-label"><span>自定义细节</span></div>
+      <div id="custom-settings" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:4px;"></div>
+    </div>
+
+    <!-- 陀螺仪设置 -->
+    <div class="section">
+      <div class="section-label">
+        <span>陀螺仪设置</span>
+        <span class="hint">仅移动端生效</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding:8px;background:var(--panel);border-radius:10px;border:1px solid var(--line2);">
+        <div class="opt" id="btn-gyro-toggle" style="padding:10px 14px;text-align:left;display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
+          <span>启用陀螺仪视角</span>
+          <span id="gyro-status" style="color:var(--dim2);font-size:11px;">未开启</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:0 14px;">
+          <span style="font-size:11px;color:var(--dim);">灵敏度</span>
+          <input type="range" id="gyro-sensitivity" min="0.1" max="3.0" step="0.1" value="1.0" style="flex:1;cursor:pointer;">
+          <span id="gyro-sens-val" style="font-size:11px;color:var(--accent);width:26px;text-align:right;">1.0</span>
+        </div>
+      </div>
+    </div>
+
     <button class="btn primary" id="btn-start" data-i18n="ui.menu.start">进 入 战 区</button>
     <button class="btn ghost" id="btn-train" data-i18n="ui.menu.train">训 练 场</button>
   </div>
@@ -310,13 +309,40 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
      ============================================================ -->
 <div id="game-screen" class="screen">
   <canvas id="game-canvas"></canvas>
+  
   <div id="hud">
-    <!-- 准星 -->
+    <!-- 1. 全屏特效层 -->
+    <div id="fx-filter"></div>
+    <div id="fx-vignette"></div>
+    <div id="fx-coupling"></div>
+    <div id="fx-hit-flash"></div>
+
+    <!-- 2. 伤害指示器 -->
+    <canvas id="dmg-indicator"></canvas>
+
+    <!-- 3. 准星 -->
     <div id="crosshair">
-      <div class="v1"></div><div class="v2"></div>
+      <div class="line-h" style="left:0;"></div>
+      <div class="line-h" style="right:0;"></div>
+      <div class="line-v" style="top:0;"></div>
+      <div class="line-v" style="bottom:0;"></div>
+      <svg id="hit-marker" width="24" height="24" viewBox="0 0 24 24">
+        <line x1="4" y1="4" x2="8" y2="8" stroke="#ffdd44" stroke-width="2" />
+        <line x1="20" y1="4" x2="16" y2="8" stroke="#ffdd44" stroke-width="2" />
+        <line x1="4" y1="20" x2="8" y2="16" stroke="#ffdd44" stroke-width="2" />
+        <line x1="20" y1="20" x2="16" y2="16" stroke="#ffdd44" stroke-width="2" />
+      </svg>
     </div>
 
-    <!-- 任务面板 -->
+    <!-- 4. 小地图 -->
+    <div id="minimap-container">
+      <canvas id="minimap" width="150" height="150"></canvas>
+    </div>
+
+    <!-- 5. 击杀播报 -->
+    <div id="kill-feed"></div>
+
+    <!-- 6. 任务面板 -->
     <div id="top-left">
       <div class="task-panel">
         <div class="panel-title" data-i18n="ui.game.task_title">📋 任务</div>
@@ -324,74 +350,48 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
       </div>
     </div>
 
-    <!-- 玩家面板 -->
+    <!-- 7. 玩家状态 -->
     <div id="bottom-left">
-  <d<div id="bottom-left">
-  <div class="player-panel">
-    <div class="player-name">
-      <span id="player-name">—</span>
-      <span class="tag" id="player-tag">—</span>
+      <div class="player-panel">
+        <div class="player-name">
+          <span id="player-name">—</span>
+          <span class="tag" id="player-tag">—</span>
+        </div>
+        <div class="stat-row">
+          <span data-i18n="ui.game.hp">生命</span>
+          <div class="bar"><div id="hp-bar"></div><span id="hp-text">100%</span></div>
+        </div>
+        <div class="stat-row" style="margin-top:4px">
+          <span style="color:#ffd93d">体力</span>
+          <div class="bar" style="height:8px"><div id="stamina-bar" style="background:linear-gradient(90deg,#ffd93d,#fff08a);width:100%"></div></div>
+        </div>
+        <div class="stat-row" id="cp-row">
+          <span data-i18n="ui.game.cp">耦合</span>
+          <div class="bar cp"><div id="cp-bar"></div><span id="cp-text">100%</span></div>
+        </div>
+      </div>
     </div>
-    <div class="stat-row">
-      <span data-i18n="ui.game.hp">生命</span>
-      <div class="bar"><div id="hp-bar" style="height:100%;width:100%"></div><span id="hp-text">100%</span></div>
-    </div>
-    <!-- 新增体力条 -->
-    <div class="stat-row" style="margin-top:4px">
-      <span style="color:#ffd93d">体力</span>
-      <div class="bar" style="height:8px"><div id="stamina-bar" style="background:linear-gradient(90deg,#ffd93d,#fff08a);width:100%"></div></div>
-    </div>
-    <div class="stat-row" id="cp-row">
-      <span data-i18n="ui.game.cp">耦合</span>
-      <div class="bar cp"><div id="cp-bar" style="height:100%;width:100%"></div><span id="cp-text">100%</span></div>
-    </div>
-  </div>
-</div>
 
-    <!-- 武器 / 弹药 -->
+    <!-- 8. 武器区 -->
     <div id="bottom-right">
       <div class="weapon-name" id="weapon-name"></div>
       <div class="ammo-text"><span id="ammo-mag">0</span> / <span id="ammo-reserve">0</span></div>
     </div>
 
-    <!-- 耦合防护 L1 / L2 / L3 -->
+    <!-- 9. 防护按钮 -->
     <div id="protect-group">
-      <button class="protect-btn l1" data-level="L1">
-        <div class="lv">L1</div>
-        <div class="desc" data-i18n="ui.game.protect_l1">冷兵器</div>
-      </button>
-      <button class="protect-btn l2" data-level="L2">
-        <div class="lv">L2</div>
-        <div class="desc" data-i18n="ui.game.protect_l2">+热兵器</div>
-      </button>
-      <button class="protect-btn l3" data-level="L3">
-        <div class="lv">L3</div>
-        <div class="desc" data-i18n="ui.game.protect_l3">全防护</div>
-      </button>
+      <button class="protect-btn l1" data-level="L1"><div class="lv">L1</div><div class="desc" data-i18n="ui.game.protect_l1">冷兵器</div></button>
+      <button class="protect-btn l2" data-level="L2"><div class="lv">L2</div><div class="desc" data-i18n="ui.game.protect_l2">+热兵器</div></button>
+      <button class="protect-btn l3" data-level="L3"><div class="lv">L3</div><div class="desc" data-i18n="ui.game.protect_l3">全防护</div></button>
     </div>
 
-    <!-- 受伤/状态滤镜层 -->
-<div id="fx-filter" style="position:absolute;inset:0;pointer-events:none;z-index:10;transition:all 0.2s;backdrop-filter:none;"></div>
-
-<!-- 电子纹样/受伤噪点层 -->
-<div id="fx-vignette" style="position:absolute;inset:0;pointer-events:none;z-index:11;opacity:0;background:radial-gradient(circle, transparent 40%, rgba(200,0,0,0.6) 100%);transition:opacity 0.5s;"></div>
-
-<!-- 耦合边缘光芒层 -->
-<div id="fx-coupling" style="position:absolute;inset:0;pointer-events:none;z-index:12;box-shadow:none;transition:box-shadow 0.3s, background 0.3s;"></div>
-
-<!-- 受伤红屏闪烁层 -->
-<div id="fx-hit-flash" style="position:absolute;inset:0;pointer-events:none;z-index:13;background:rgba(255,0,0,0.4);opacity:0;transition:opacity 0.1s;"></div>
-
-    <!-- 撤离进度 -->
+    <!-- 10. 撤离进度 -->
     <div id="extract-progress">
       <div class="progress-label" data-i18n="ui.game.extract_progress">撤 离 中</div>
       <div class="progress-bar"><div id="extract-fill"></div></div>
     </div>
 
-    <!-- 事件横幅 -->
-    <div id="event-banner"></div>
-
-    <!-- 暂停按钮 -->
+    <!-- 11. 暂停按钮 -->
     <button id="pause-btn">❚❚</button>
   </div>
 
@@ -431,19 +431,13 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
   </div>
 </div>
 
-<!-- ============================================================
-     Copyright · 版权
-     ============================================================ -->
 <div class="copyright-bar">
-  <b>LaiAsaka Engine</b> · v3.0.0<br>
+  <b>LaiAsaka Engine</b> · v3.1.0<br>
   © 2026 ZpycuA · CC BY-NC 4.0
 </div>
 
 <!-- ============================================================
      模块加载
-     ------------------------------------------------------------
-     Three.js 通过 importmap 从 CDN 加载。
-     其余模块在同目录的 .js 文件中，通过 ES Module import 引用。
      ============================================================ -->
 <script type="importmap">
 {
@@ -455,24 +449,6 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
 </script>
 
 <script type="module">
-/* ============================================================
-   LaiAsaka Engine · 入口引导脚本
-   ------------------------------------------------------------
-   本文件只做：
-     1. 按顺序动态 import 各模块
-     2. 组装 Engine / Content / Modes / GameApp
-     3. 处理加载失败时给出友好提示
-     4. 绑定最上层的 UI（语言切换、DEV 按钮、Boot 进度）
-
-   各模块的职责（见下方注释）：
-     engine.js         → 引擎核心（不含任何游戏概念）
-     content.js        → 游戏内容注册（武器/敌人/地图/角色/任务 DSL）
-     modes.js          → 模式注册（straight / asaka 接口实现）
-     game.js           → 应用层（GameApp + GameWorld + systems）
-     locale.zh-CN.js   → 中文文案表
-     locale.en-US.js   → 英文文案表
-   ============================================================ */
-
 (function () {
   const statusEl = document.getElementById('boot-status');
   const errorEl = document.getElementById('boot-error');
@@ -504,112 +480,110 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
     console.error('[LaiAsaka] Boot failed:', err);
   }
 
-  /* ---- 加载流程 ---- */
-(async function boot() {
-  try {
-    setStatus('正在加载引擎核心…', 10);
-    const { Engine } = await import('./engine.js');
+  (async function boot() {
+    try {
+      setStatus('正在加载引擎核心…', 10);
+      const { Engine } = await import('./engine.js');
 
-    setStatus('正在加载语言包…', 25);
-    const zhCN = (await import('./locale.zh-CN.js')).default;
-    const enUS = (await import('./locale.en-US.js')).default;
+      setStatus('正在加载语言包…', 25);
+      const zhCN = (await import('./locale.zh-CN.js')).default;
+      const enUS = (await import('./locale.en-US.js')).default;
 
-    setStatus('正在加载内容表…', 40);
-    const { registerDefaultContent } = await import('./content.js');
+      setStatus('正在加载内容表…', 40);
+      const { registerDefaultContent } = await import('./content.js');
 
-    setStatus('正在加载模式…', 55);
-    const { registerModes } = await import('./modes.js');
+      setStatus('正在加载模式…', 55);
+      const { registerModes } = await import('./modes.js');
 
-    setStatus('正在加载应用层…', 70);
-    const { GameApp } = await import('./game.js');
+      setStatus('正在加载应用层…', 70);
+      const { GameApp } = await import('./game.js');
 
-    setStatus('正在初始化引擎…', 85);
-    const engine = new Engine();
-    await engine.init({
-      canvas: document.getElementById('game-canvas'),
-      locale: { 'zh-CN': zhCN, 'en-US': enUS },
-      defaultLocale: 'zh-CN',
-    });
-
-    // 注册内容
-    registerDefaultContent(engine);
-
-    // 注册模式（straight / asaka 接口）
-    registerModes(engine);
-
-    // 应用层
-    const app = new GameApp(engine);
-    engine.app = app;
-    
-    // ★ 核心修复：在此处直接绑定入口按钮，绕过 game.js 的潜在错误
-    const btnStart = document.getElementById('btn-start');
-    const btnTrain = document.getElementById('btn-train');
-    
-    if (btnStart) {
-      btnStart.onclick = (e) => {
-        e.preventDefault();
-        try {
-          app.startMatch('normal');
-        } catch (err) {
-          console.error('进入战区失败', err);
-          alert('进入战区失败：\n' + (err.stack || err.message || String(err)));
-        }
-      };
-    }
-    
-    if (btnTrain) {
-      btnTrain.onclick = (e) => {
-        e.preventDefault();
-        try {
-          app.startMatch('training');
-        } catch (err) {
-          console.error('进入训练场失败', err);
-          alert('进入训练场失败：\n' + (err.stack || err.message || String(err)));
-        }
-      };
-    }
-
-    // 初始化菜单渲染
-    app.boot();
-
-    setStatus('就绪', 100);
-    setTimeout(() => {
-      const boot = document.getElementById('boot-screen');
-      const menu = document.getElementById('menu-screen');
-      if (boot) boot.classList.remove('on');
-      if (menu) menu.classList.add('on');
-      engine.start();
-    }, 300);
-
-    /* ---- 语言切换（顶层 UI，由 GameApp 接管具体渲染） ---- */
-    const langSelector = document.getElementById('lang-selector');
-    if (langSelector) {
-      langSelector.addEventListener('click', (ev) => {
-        const btn = ev.target.closest('[data-lang]');
-        if (!btn) return;
-        const lang = btn.dataset.lang;
-        langSelector.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('on', b === btn));
-        try {
-          app.setLanguage(lang);
-        } catch (e) {
-          console.error('[Lang] switch failed:', e);
-        }
+      setStatus('正在初始化引擎…', 85);
+      const engine = new Engine();
+      await engine.init({
+        canvas: document.getElementById('game-canvas'),
+        locale: { 'zh-CN': zhCN, 'en-US': enUS },
+        defaultLocale: 'zh-CN',
       });
-    }
 
-    /* ---- DEV 按钮 ---- */
-    const devBtn = document.getElementById('btn-dev-console');
-    if (devBtn) {
-      devBtn.addEventListener('click', () => {
-        if (engine.devConsole) engine.devConsole.toggle();
-      });
+      // 注册内容
+      registerDefaultContent(engine);
+
+      // 注册模式（straight / asaka 接口）
+      registerModes(engine);
+
+      // 应用层
+      const app = new GameApp(engine);
+      engine.app = app;
+      
+      // ★ 核心修复：在此处直接绑定入口按钮，绕过 game.js 的潜在错误
+      const btnStart = document.getElementById('btn-start');
+      const btnTrain = document.getElementById('btn-train');
+      
+      if (btnStart) {
+        btnStart.onclick = (e) => {
+          e.preventDefault();
+          try {
+            app.startMatch('normal');
+          } catch (err) {
+            console.error('进入战区失败', err);
+            alert('进入战区失败：\n' + (err.stack || err.message || String(err)));
+          }
+        };
+      }
+      
+      if (btnTrain) {
+        btnTrain.onclick = (e) => {
+          e.preventDefault();
+          try {
+            app.startMatch('training');
+          } catch (err) {
+            console.error('进入训练场失败', err);
+            alert('进入训练场失败：\n' + (err.stack || err.message || String(err)));
+          }
+        };
+      }
+
+      // 初始化菜单渲染
+      app.boot();
+
+      setStatus('就绪', 100);
+      setTimeout(() => {
+        const boot = document.getElementById('boot-screen');
+        const menu = document.getElementById('menu-screen');
+        if (boot) boot.classList.remove('on');
+        if (menu) menu.classList.add('on');
+        engine.start();
+      }, 300);
+
+      /* ---- 语言切换 ---- */
+      const langSelector = document.getElementById('lang-selector');
+      if (langSelector) {
+        langSelector.addEventListener('click', (ev) => {
+          const btn = ev.target.closest('[data-lang]');
+          if (!btn) return;
+          const lang = btn.dataset.lang;
+          langSelector.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('on', b === btn));
+          try {
+            app.setLanguage(lang);
+          } catch (e) {
+            console.error('[Lang] switch failed:', e);
+          }
+        });
+      }
+
+      /* ---- DEV 按钮 ---- */
+      const devBtn = document.getElementById('btn-dev-console');
+      if (devBtn) {
+        devBtn.addEventListener('click', () => {
+          if (engine.devConsole) engine.devConsole.toggle();
+        });
+      }
+    } catch (err) {
+      showError('启动失败：无法加载依赖文件', err);
+      alert('启动崩溃：\n' + (err.stack || err.message || String(err)));
     }
-  } catch (err) {
-    showError('启动失败：无法加载依赖文件', err);
-    // 如果模块加载报错，直接弹窗
-    alert('启动崩溃：\n' + (err.stack || err.message || String(err)));
-  }
-})();
+  })();
 })();
 </script>
 </body>
