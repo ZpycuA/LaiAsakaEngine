@@ -2109,84 +2109,72 @@ export class GameApp {
   });
 }
 
-   _setupMobileControls(isMobile) {
-    let container = document.getElementById('mobile-controls');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'mobile-controls';
-      container.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:35;display:none';
-      document.getElementById('game-screen').appendChild(container);
-    }
-
-    if (!isMobile) {
-      container.style.display = 'none';
-      return;
-    }
-    container.style.display = 'block';
-    if (container.children.length > 0) return;
-
-    // ★ 左侧摇杆区域（透明触摸层，用于生成虚拟摇杆）
-    const leftStick = document.createElement('div');
-    leftStick.style.cssText = 'position:absolute;left:0;bottom:0;width:45%;height:60%;pointer-events:auto;touch-action:none;';
-    let leftStickId = null;
-
-    leftStick.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'touch') return;
-      leftStickId = e.pointerId;
-      this.engine.input.startLeftStick(e.clientX, e.clientY, leftStickId);
-    });
-    leftStick.addEventListener('pointermove', (e) => {
-      if (e.pointerId === leftStickId) this.engine.input.moveLeftStick(e.clientX, e.clientY);
-    });
-    const endLeft = (e) => {
-      if (e.pointerId === leftStickId) {
-        this.engine.input.endLeftStick();
-        leftStickId = null;
-      }
-    };
-    leftStick.addEventListener('pointerup', endLeft);
-    leftStick.addEventListener('pointercancel', endLeft);
-
-    container.appendChild(leftStick);
-
-    // ★ 右侧按钮布局（增加冲刺和跳跃）
-    const layout = [
-      { id: 'fire', label: '开火', right: '20px', bottom: '80px', size: 80, color: 'rgba(255,80,80,.4)', border: 'rgba(255,100,100,.8)' },
-      { id: 'jump', label: '跳跃', right: '120px', bottom: '40px', size: 60, color: 'rgba(80,255,150,.4)', border: 'rgba(100,255,150,.8)' },
-      { id: 'reload', label: '换弹', right: '20px', bottom: '180px', size: 60, color: 'rgba(200,200,200,.3)', border: 'rgba(255,255,255,.6)' },
-      { id: 'sprint', label: '疾跑', right: '90px', bottom: '120px', size: 55, color: 'rgba(255,200,80,.4)', border: 'rgba(255,200,80,.8)' }
-    ];
-
-    for (const btn of layout) {
-      const el = document.createElement('div');
-      el.style.cssText = `
-        position:absolute;right:${btn.right};bottom:${btn.bottom};
-        width:${btn.size}px;height:${btn.size}px;border-radius:50%;
-        background:${btn.color};border:2px solid ${btn.border};
-        color:#fff;display:flex;align-items:center;justify-content:center;
-        pointer-events:auto;font-weight:800;font-size:14px;
-        user-select:none;-webkit-user-select:none;touch-action:none;
-        box-shadow:0 4px 12px rgba(0,0,0,.4);z-index:36;
-      `;
-      el.textContent = btn.label;
-      
-      el.addEventListener('pointerdown', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        this.engine.input.setActionState(btn.id, true);
-        el.style.transform = 'scale(0.9)';
-      });
-      
-      const release = (e) => {
-        e.preventDefault(); e.stopPropagation();
-        this.engine.input.setActionState(btn.id, false);
-        el.style.transform = 'scale(1)';
-      };
-      
-      el.addEventListener('pointerup', release);
-      el.addEventListener('pointercancel', release);
-      el.addEventListener('pointerleave', release);
-      
-      container.appendChild(el);
-    }
+  _setupMobileControls(isMobile) {
+  let container = document.getElementById('mobile-controls');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'mobile-controls';
+    container.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:35;display:none';
+    document.getElementById('game-screen').appendChild(container);
   }
+
+  if (!isMobile) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'block';
+  if (container.children.length > 0) return;
+
+  // ★ 预留的可自定义键位表（以后只需读取存档更改 left/bottom 即可实现拖拽换位）
+  const layout = [
+    // 右手区域
+    { id: 'fire', label: '开火', right: '20px', bottom: '80px', size: 80, color: 'rgba(255,80,80,.4)', border: 'rgba(255,100,100,.8)' },
+    { id: 'jump', label: '跳跃', right: '120px', bottom: '40px', size: 60, color: 'rgba(80,255,150,.4)', border: 'rgba(100,255,150,.8)' },
+    { id: 'reload', label: '换弹', right: '20px', bottom: '180px', size: 60, color: 'rgba(200,200,200,.3)', border: 'rgba(255,255,255,.6)' },
+    // 左手区域（左下角开火）
+    { id: 'fire_left', label: '开火', left: '30px', bottom: '150px', size: 70, color: 'rgba(255,80,80,.3)', border: 'rgba(255,100,100,.6)' }
+  ];
+
+  for (const btn of layout) {
+    const el = document.createElement('div');
+    el.className = 'mobile-btn';
+    // 根据配置决定是靠左还是靠右
+    let posCss = '';
+    if (btn.left) posCss += `left:${btn.left};`;
+    if (btn.right) posCss += `right:${btn.right};`;
+    posCss += `bottom:${btn.bottom};`;
+
+    el.style.cssText = `
+      position:absolute;${posCss}
+      width:${btn.size}px;height:${btn.size}px;border-radius:50%;
+      background:${btn.color};border:2px solid ${btn.border};
+      color:#fff;display:flex;align-items:center;justify-content:center;
+      pointer-events:auto;font-weight:800;font-size:14px;
+      user-select:none;-webkit-user-select:none;touch-action:none;
+      box-shadow:0 4px 12px rgba(0,0,0,.4);z-index:36;
+    `;
+    el.textContent = btn.label;
+    
+    // 映射到真正的输入状态
+    const actionId = btn.id === 'fire_left' ? 'fire' : btn.id;
+
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      this.engine.input.setActionState(actionId, true);
+      el.style.transform = 'scale(0.9)';
+    });
+    
+    const release = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      this.engine.input.setActionState(actionId, false);
+      el.style.transform = 'scale(1)';
+    };
+    
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+    el.addEventListener('pointerleave', release);
+    
+    container.appendChild(el);
+  }
+}
 }
