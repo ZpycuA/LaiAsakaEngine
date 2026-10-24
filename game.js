@@ -1879,7 +1879,7 @@ export class GameApp {
     }
     return ok;
   }
-    _bindCameraControls() {
+      _bindCameraControls() {
     if (this._camBound) return;
     this._camBound = true;
     let isDragging = false;
@@ -1887,9 +1887,11 @@ export class GameApp {
     const canvas = this.engine.renderer.canvas;
 
     canvas.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'mouse' && e.button !== 2) return;
-      isDragging = true;
-      lastX = e.clientX; lastY = e.clientY;
+      // 只有 PC 鼠标右键才允许拖拽
+      if (e.pointerType === 'mouse' && e.button === 2) {
+        isDragging = true;
+        lastX = e.clientX; lastY = e.clientY;
+      }
     });
 
     window.addEventListener('pointermove', (e) => {
@@ -1897,12 +1899,13 @@ export class GameApp {
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
       lastX = e.clientX; lastY = e.clientY;
-      if (this.engine.cameraCtl) {
-        this.engine.cameraCtl.rotate(dx, dy);
-      }
+      if (this.engine.cameraCtl) this.engine.cameraCtl.rotate(dx, dy);
     });
 
-    window.addEventListener('pointerup', () => { isDragging = false; });
+    window.addEventListener('pointerup', (e) => { 
+      if (e.button === 2) isDragging = false; 
+    });
+    window.addEventListener('contextmenu', e => e.preventDefault());
   }
 
   _renderCustomSettings(){
