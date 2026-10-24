@@ -1,0 +1,1325 @@
+/* ============================================================
+   LaiAsaka Engine · Core
+   v3.0.0 · © 2026 ZpycuA · CC BY-NC 4.0
+   ------------------------------------------------------------
+   本文件只包含引擎能力，不含任何游戏概念（无武器/无敌人/无地图）。
+   引擎对外接口：
+     new Engine()
+     await engine.init({ canvas, locale, defaultLocale })
+     engine.start() / engine.stop()
+     engine.setLanguage(code)
+     engine.physicsFactory()      → 返回新的 PhysicsWorld
+     engine.content                → ContentRegistry
+     engine.i18n                   → I18nSystem
+     engine.modeRegistry           → ModeRegistry
+     engine.bus                    → EventBus
+     engine.input                  → InputSystem
+     engine.renderer               → Renderer3D (Three.js 封装)
+     engine.meshes                 → MeshFactory
+     engine.save                   → SaveSystem
+     engine.loader                 → Loader（下次实现）
+     engine.audio                  → AudioSystem（下次实现）
+     engine.devConsole             → DevConsole
+     engine.loop                   → FixedLoop
+     engine.scenes                 → SceneManager
+     engine.app                    → 由外部注入（GameApp）
+   ============================================================ */
+
+import * as THREE from 'three';
+
+/* ============================================================
+   [0] 工具
+   ============================================================ */
+const TAU = Math.PI * 2;
+
+const clamp   = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp    = (a, b, t) => a + (b - a) * t;
+const rand    = (a, b) => a + Math.random() * (b - a);
+const randi   = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
+const pick    = arr => arr[(Math.random() * arr.length) | 0];
+const dist    = (ax, az, bx, bz) => Math.hypot(bx - ax, bz - az);
+const distSq  = (ax, az, bx, bz) => (bx - ax) ** 2 + (bz - az) ** 2;
+
+const angDiff = (a, b) => {
+  let d = (a - b) % TAU;
+  if (d > Math.PI) d -= TAU;
+  if (d < -Math.PI) d += TAU;
+  return d;
+};
+
+const $  = id  => document.getElementById(id);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+const Utils = { clamp, lerp, rand, randi, pick, dist, distSq, angDiff, TAU, $, $$ };
+
+/* ============================================================
+   [1] EventBus
+   ============================================================ */
+class EventBus {
+  constructor(){ this._m = new Map(); }
+  on(name, fn){
+    let s = this._m.get(name);
+    if (!s) { s = new Set(); this._m.set(name, s); }
+    s.add(fn);
+    return () => s.delete(fn);
+  }
+  off(name, fn){
+    const s = this._m.get(name);
+    if (s) s.delete(fn);
+  }
+  once(name, fn){
+    const off = this.on(name, (p) => { off(); fn(p); });
+    return off;
+  }
+  emit(name, payload){
+    const s = this._m.get(name);
+    if (!s) return;
+    for (const fn of [...s]) {
+      try { fn(payload); } catch (e) { console.error('[bus]', name, e); }
+    }
+  }
+  clear(name){
+    if (name) this._m.delete(name);
+    else this._m.clear();
+  }
+}
+
+/* ============================================================
+   [2] ObjectPool
+   ============================================================ */
+class ObjectPool {
+  constructor(factory, reset){
+    this.factory = factory;
+    this.reset   = reset || null;
+    this.free    = [];
+    this.active  = new Set();
+  }
+  acquire(){
+    const obj = this.free.pop() || this.factory();
+    this.active.add(obj);
+    return obj;
+  }
+  release(obj){
+    if (!this.active.has(obj)) return;
+    this.active.delete(obj);
+    if (this.reset) { try { this.reset(obj); } catch (e) { console.warn('[Pool] reset err', e); } }
+    this.free.push(obj);
+  }
+  releaseAll(){
+    for (const obj of this.active) {
+      if (this.reset) this.reset(obj);
+      this.free.push(obj);
+    }
+    this.active.clear();
+  }
+  get stats(){ return { free: this.free.length, active: this.active.size }; }
+}
+
+/* ============================================================
+   [3] SpatialHash · 2D 平面空间哈希（X/Z 平面）
+   ============================================================ */
+class SpatialHash {
+  constructor(cellSize){
+    this.cellSize = cellSize || 8;
+    this.cells = new Map();
+  }
+  _key(cx, cz){ return cx + ',' + cz; }
+  clear(){ this.cells.clear(); }
+  insert(body){
+    const cx = Math.floor(body.position.x / this.cellSize);
+    const cz = Math.floor(body.position.z / this.cellSize);
+    const k  = this._key(cx, cz);
+    let arr = this.cells.get(k);
+    if (!arr) { arr = []; this.cells.set(k, arr); }
+    arr.push(body);
+  }
+  queryCircle(x, z, r){
+    const result = [];
+    const cs = this.cellSize;
+    const minCX = Math.floor((x - r) / cs);
+    const maxCX = Math.floor((x + r) / cs);
+    const minCZ = Math.floor((z - r) / cs);
+    const maxCZ = Math.floor((z + r) / cs);
+    const r2 = r * r;
+    for (let cx = minCX; cx <= maxCX; cx++) {
+      for (let cz = minCZ; cz <= maxCZ; cz++) {
+        const arr = this.cells.get(this._key(cx, cz));
+        if (!arr) continue;
+        for (const b of arr) {
+          const dx = b.position.x - x;
+          const dz = b.position.z - z;
+          const rr = r + (b.radius || 0);
+          if (dx * dx + dz * dz <= rr * rr) result.push(b);
+        }
+      }
+    }
+    return result;
+  }
+}
+
+/* ============================================================
+   [4] FixedLoop · 固定步长主循环
+   ------------------------------------------------------------
+   step      固定物理步长（秒）
+   maxSteps  单帧最多物理步数（防 dt 抖动导致穿透）
+   onStep    每固定步调用
+   onRender  每帧调用（alpha 是当前帧的插值因子）
+   ============================================================ */
+class FixedLoop {
+  constructor({ step = 1/60, maxSteps = 4, onStep, onRender }){
+    this.step = step;
+    this.maxSteps = maxSteps;
+    this.onStep = onStep;
+    this.onRender = onRender;
+    this.accumulator = 0;
+    this.lastTime = 0;
+    this.running = false;
+    this._raf = null;
+    this._tick = this._tick.bind(this);
+  }
+  start(){
+    if (this.running) return;
+    this.running = true;
+    this.lastTime = performance.now();
+    this._raf = requestAnimationFrame(this._tick);
+  }
+  stop(){
+    this.running = false;
+    if (this._raf) cancelAnimationFrame(this._raf);
+    this._raf = null;
+  }
+  _tick(now){
+    if (!this.running) return;
+    let frameTime = (now - this.lastTime) / 1000;
+    this.lastTime = now;
+    if (frameTime > 0.25) frameTime = 0.25;
+    this.accumulator += frameTime;
+    let steps = 0;
+    while (this.accumulator >= this.step && steps < this.maxSteps) {
+      try { this.onStep(this.step); }
+      catch (e) { console.error('[FixedLoop] step err:', e); }
+      this.accumulator -= this.step;
+      steps++;
+    }
+    if (steps >= this.maxSteps) this.accumulator = 0;
+    try { if (this.onRender) this.onRender(this.accumulator / this.step); }
+    catch (e) { console.error('[FixedLoop] render err:', e); }
+    this._raf = requestAnimationFrame(this._tick);
+  }
+}
+
+/* ============================================================
+   [5] I18nSystem · 多语言
+   ------------------------------------------------------------
+   register(code, table)
+   setLanguage(code)
+   t(key, params?)           - params 用 {name} 插值
+   applyToDOM(root?)         - 处理 data-i18n / data-i18n-html / data-i18n-placeholder
+   hasLanguage(code)
+   ============================================================ */
+class I18nSystem {
+  constructor(){
+    this.tables = new Map();
+    this.current = {};
+    this.currentCode = null;
+    this.fallback = {};
+  }
+  register(code, table){
+    this.tables.set(code, table || {});
+  }
+  setLanguage(code){
+    this.currentCode = code;
+    this.current = this.tables.get(code) || {};
+  }
+  setFallback(table){ this.fallback = table || {}; }
+  hasLanguage(code){ return this.tables.has(code); }
+  t(key, params){
+    let str = this.current[key];
+    if (str === undefined) str = this.fallback[key];
+    if (str === undefined) str = key;
+    if (params) {
+      for (const k in params) {
+        str = str.split('{' + k + '}').join(String(params[k]));
+      }
+    }
+    return str;
+  }
+  applyToDOM(root){
+    root = root || document;
+    root.querySelectorAll('[data-i18n]').forEach(el => {
+      el.textContent = this.t(el.dataset.i18n);
+    });
+    root.querySelectorAll('[data-i18n-html]').forEach(el => {
+      el.innerHTML = this.t(el.dataset.i18nHtml);
+    });
+    root.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      el.placeholder = this.t(el.dataset.i18nPlaceholder);
+    });
+  }
+}
+
+/* ============================================================
+   [6] ContentRegistry · 内容注册与校验
+   ------------------------------------------------------------
+   register(table, id, spec)     - 单条注册
+   registerAll(table, items)     - 批量注册
+   load(json)                    - 从 { table: { id: spec } } 结构加载
+   get(table, id) / all(table) / has(table, id)
+   validate()                    - 检查引用（weapon.ammoType → ammo 等）
+   ============================================================ */
+class ContentRegistry {
+  constructor(){
+    this.tables = new Map();
+  }
+  table(name){
+    if (!this.tables.has(name)) this.tables.set(name, new Map());
+    return this.tables.get(name);
+  }
+  register(table, id, spec){
+    this.table(table).set(id, Object.freeze({ id, ...spec }));
+  }
+  registerAll(table, items){
+    for (const [id, spec] of Object.entries(items || {})) this.register(table, id, spec);
+  }
+  load(json){
+    for (const [table, items] of Object.entries(json || {})) {
+      if (!items || typeof items !== 'object') continue;
+      for (const [id, spec] of Object.entries(items)) this.register(table, id, spec);
+    }
+  }
+  get(table, id){ return this.table(table).get(id); }
+  has(table, id){ return this.table(table).has(id); }
+  all(table){ return Array.from(this.table(table).values()); }
+  count(table){ return this.table(table).size; }
+  /* 常用引用校验：外部可扩展 */
+  validate(){
+    const errs = [];
+    const check = (table, id, field, target) => {
+      const spec = this.get(table, id);
+      if (!spec) return;
+      const ref = spec[field];
+      if (ref && !this.has(target, ref)) {
+        errs.push(`${table}/${id}.${field} → ${target}/${ref} 不存在`);
+      }
+    };
+    for (const w of this.all('weapons'))    check('weapons', w.id, 'ammoType', 'ammo');
+    for (const e of this.all('enemies'))    check('enemies', e.id, 'weapon', 'weapons');
+    for (const c of this.all('characters')) {
+      check('characters', c.id, 'weapon', 'weapons');
+      check('characters', c.id, 'sidearm', 'weapons');
+    }
+    return errs;
+  }
+}
+
+/* ============================================================
+   [7] SaveSystem · 存档
+   ============================================================ */
+class SaveSystem {
+  constructor(key){
+    this.key = key;
+    this.data = null;
+  }
+  load(defaults){
+    const def = JSON.parse(JSON.stringify(defaults || {}));
+    try {
+      const raw = localStorage.getItem(this.key);
+      this.data = raw ? JSON.parse(raw) : def;
+      for (const k in def) {
+        if (this.data[k] === undefined) this.data[k] = JSON.parse(JSON.stringify(def[k]));
+      }
+    } catch (e) {
+      console.warn('[Save] load fail', e);
+      this.data = def;
+    }
+    return this.data;
+  }
+  save(){
+    try { localStorage.setItem(this.key, JSON.stringify(this.data)); return true; }
+    catch (e) { console.warn('[Save] write fail', e); return false; }
+  }
+  reset(defaults){
+    this.data = JSON.parse(JSON.stringify(defaults || {}));
+    this.save();
+    return this.data;
+  }
+}
+
+/* ============================================================
+   [8] InputSystem · 键鼠 + 触屏
+   ------------------------------------------------------------
+   registerAction(name, { keys?: string[], mouse?: 'left'|'right' })
+   isActive(name)
+   getMoveVector()    → { x, z } 归一化
+   getAimVector(ox, oz, camera) → { x, z } 方向向量
+   ============================================================ */
+class InputSystem {
+  constructor(){
+    this.keys = new Set();
+    this.mouse = { x: 0, y: 0, left: false, right: false };
+    this.touch = { left: null, right: null };
+    this.actions = new Map();
+    this._bound = false;
+  }
+  registerAction(name, cfg){ this.actions.set(name, cfg || {}); }
+  isActive(name){
+    const cfg = this.actions.get(name);
+    if (!cfg) return false;
+    if (cfg.keys) {
+      for (const k of cfg.keys) if (this.keys.has(k)) return true;
+    }
+    if (cfg.mouse === 'left'  && this.mouse.left)  return true;
+    if (cfg.mouse === 'right' && this.mouse.right) return true;
+    return false;
+  }
+  getMoveVector(){
+    let mx = 0, mz = 0;
+    if (this.keys.has('w') || this.keys.has('arrowup'))    mz -= 1;
+    if (this.keys.has('s') || this.keys.has('arrowdown'))  mz += 1;
+    if (this.keys.has('a') || this.keys.has('arrowleft'))  mx -= 1;
+    if (this.keys.has('d') || this.keys.has('arrowright')) mx += 1;
+    if (this.touch.left) {
+      const dx = this.touch.left.x - this.touch.left.ox;
+      const dz = this.touch.left.y - this.touch.left.oy;
+      const l = Math.hypot(dx, dz);
+      if (l > 8) { const k = Math.min(l, 60) / 60; mx = dx / l * k; mz = dz / l * k; }
+    }
+    const l = Math.hypot(mx, mz);
+    if (l > 1) { mx /= l; mz /= l; }
+    return { x: mx, z: mz };
+  }
+  getAimVector(ox, oz, camera){
+    if (this.touch.right) {
+      const dx = this.touch.right.x - this.touch.right.ox;
+      const dz = this.touch.right.y - this.touch.right.oy;
+      if (Math.hypot(dx, dz) > 10) return { x: dx, z: dz };
+    }
+    if (camera) {
+      const ray = new THREE.Raycaster();
+      const ndc = new THREE.Vector2(
+        (this.mouse.x / window.innerWidth) * 2 - 1,
+        -(this.mouse.y / window.innerHeight) * 2 + 1
+      );
+      ray.setFromCamera(ndc, camera);
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const pt = new THREE.Vector3();
+      ray.ray.intersectPlane(plane, pt);
+      if (pt) return { x: pt.x - ox, z: pt.z - oz };
+    }
+    return { x: 0, z: 0 };
+  }
+  attach(canvas){
+    if (this._bound) return;
+    this._bound = true;
+    window.addEventListener('keydown', e => {
+      const k = e.key.toLowerCase();
+      this.keys.add(k);
+      if ([' ', 'tab', 'escape', 'shift'].includes(k)) e.preventDefault();
+    });
+    window.addEventListener('keyup', e => this.keys.delete(e.key.toLowerCase()));
+    canvas.addEventListener('mousemove', e => {
+      this.mouse.x = e.clientX;
+      this.mouse.y = e.clientY;
+    });
+    canvas.addEventListener('mousedown', e => {
+      if (e.button === 0) this.mouse.left = true;
+      if (e.button === 2) this.mouse.right = true;
+    });
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+    window.addEventListener('mouseup', e => {
+      if (e.button === 0) this.mouse.left = false;
+      if (e.button === 2) this.mouse.right = false;
+    });
+    canvas.addEventListener('touchstart', e => {
+      for (const t of e.changedTouches) {
+        const x = t.clientX, y = t.clientY;
+        if (x < window.innerWidth * 0.45 && !this.touch.left) {
+          this.touch.left = { id: t.identifier, ox: x, oy: y, x, y };
+        } else if (!this.touch.right) {
+          this.touch.right = { id: t.identifier, ox: x, oy: y, x, y };
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+    canvas.addEventListener('touchmove', e => {
+      for (const t of e.changedTouches) {
+        if (this.touch.left  && this.touch.left.id  === t.identifier) { this.touch.left.x  = t.clientX; this.touch.left.y  = t.clientY; }
+        if (this.touch.right && this.touch.right.id === t.identifier) { this.touch.right.x = t.clientX; this.touch.right.y = t.clientY; }
+      }
+      e.preventDefault();
+    }, { passive: false });
+    const endTouch = e => {
+      for (const t of e.changedTouches) {
+        if (this.touch.left  && this.touch.left.id  === t.identifier) this.touch.left  = null;
+        if (this.touch.right && this.touch.right.id === t.identifier) this.touch.right = null;
+      }
+      e.preventDefault();
+    };
+    canvas.addEventListener('touchend', endTouch, { passive: false });
+    canvas.addEventListener('touchcancel', endTouch, { passive: false });
+  }
+}
+
+/* ============================================================
+   [9] Renderer3D · Three.js 封装
+   ------------------------------------------------------------
+   正交俯视相机（2.5D 观感），场景可被 GameWorld 完全清空后重建。
+   灯光用 _lightGroup 管理，可反复调用 _setupLights() 重置。
+   ============================================================ */
+class Renderer3D {
+  constructor(canvas){
+    this.canvas = canvas;
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: 'high-performance',
+    });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setClearColor(0x080b10);
+    this.renderer.shadowMap.enabled = false;
+
+    this.scene = new THREE.Scene();
+    this.scene.fog = new THREE.Fog(0x080b10, 90, 180);
+
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 400);
+    this.camera.position.set(0, 80, 0);
+    this.camera.lookAt(0, 0, 0);
+    this.camera.zoom = 1;
+
+    this._lightGroup = null;
+    this._setupLights();
+
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+  }
+
+  _setupLights(){
+    if (!this._lightGroup) {
+      this._lightGroup = new THREE.Group();
+      this._lightGroup.name = '__engine_lights__';
+    }
+    if (!this._lightGroup.parent) this.scene.add(this._lightGroup);
+    while (this._lightGroup.children.length) {
+      this._lightGroup.remove(this._lightGroup.children[0]);
+    }
+    const ambient = new THREE.AmbientLight(0x8fb4d8, 0.55);
+    this._lightGroup.add(ambient);
+    const sun = new THREE.DirectionalLight(0xcfe6ff, 0.85);
+    sun.position.set(30, 60, 30);
+    this._lightGroup.add(sun);
+    const rim = new THREE.DirectionalLight(0xff9ec4, 0.35);
+    rim.position.set(-40, 30, -20);
+    this._lightGroup.add(rim);
+  }
+
+  resize(){
+    const w = window.innerWidth, h = window.innerHeight;
+    this.renderer.setSize(w, h, false);
+    const aspect = w / h;
+    const viewH = 70;
+    const viewW = viewH * aspect;
+    this.camera.left   = -viewW / 2;
+    this.camera.right  =  viewW / 2;
+    this.camera.top    =  viewH / 2;
+    this.camera.bottom = -viewH / 2;
+    this.camera.updateProjectionMatrix();
+  }
+
+  render(){ this.renderer.render(this.scene, this.camera); }
+  dispose(){ this.renderer.dispose(); this.scene.clear(); }
+}
+
+/* ============================================================
+   [10] MeshFactory · 网格工厂
+   ------------------------------------------------------------
+   注册 type → builder 映射；game.js 通过 build(type, spec) 取网格。
+   将来接 GLTF 模型只需替换 builder。
+   ============================================================ */
+class MeshFactory {
+  constructor(){ this.builders = new Map(); }
+  register(type, builder){ this.builders.set(type, builder); }
+  has(type){ return this.builders.has(type); }
+  build(type, spec){
+    const b = this.builders.get(type);
+    if (!b) {
+      console.warn('[MeshFactory] Unknown type:', type);
+      return new THREE.Mesh(
+        new THREE.BoxGeometry(1, 1, 1),
+        new THREE.MeshBasicMaterial({ color: 0xff00ff })
+      );
+    }
+    return b(spec || {});
+  }
+}
+
+/* ============================================================
+   [11] SceneManager · 场景管理（可选，引擎保留）
+   ============================================================ */
+class SceneManager {
+  constructor(renderer){
+    this.renderer = renderer;
+    this.scenes = new Map();
+    this.current = null;
+    this.currentName = null;
+  }
+  register(name, factory){ this.scenes.set(name, factory); }
+  has(name){ return this.scenes.has(name); }
+  switchTo(name, ...args){
+    if (this.current && this.current.exit) {
+      try { this.current.exit(); } catch (e) { console.warn('[Scene] exit err:', e); }
+    }
+    const factory = this.scenes.get(name);
+    if (!factory) throw new Error('[Scene] not found: ' + name);
+    this.current = factory(this.renderer, ...args);
+    this.currentName = name;
+    if (this.current.enter) {
+      try { this.current.enter(); } catch (e) { console.warn('[Scene] enter err:', e); }
+    }
+    return this.current;
+  }
+  update(dt){ if (this.current && this.current.update) this.current.update(dt); }
+  render(alpha){
+    if (this.current && this.current.render) this.current.render(alpha);
+    else this.renderer.render();
+  }
+}
+
+/* ============================================================
+   [12] Body · 物理体
+   ------------------------------------------------------------
+   position / velocity / force 均为 { x, y, z }
+   layer / mask 是碰撞层控制（默认 layer=1, mask=-1 即碰撞所有）
+   ============================================================ */
+class Body {
+  constructor(opts){
+    opts = opts || {};
+    this.position = { x: opts.x || 0, y: opts.y || 0, z: opts.z || 0 };
+    this.velocity = { x: 0, y: 0, z: 0 };
+    this.force    = { x: 0, y: 0, z: 0 };
+    this.radius   = opts.radius || 1;
+    this.mass     = opts.mass !== undefined ? opts.mass : 1;
+    this.invMass  = this.mass > 0 ? 1 / this.mass : 0;
+    this.restitution = opts.restitution !== undefined ? opts.restitution : 0.2;
+    this.friction = opts.friction !== undefined ? opts.friction : 0.1;
+    this.isStatic = !!opts.isStatic;
+    this.shape    = opts.shape || 'circle';
+    this.halfW    = opts.halfW || 0;
+    this.halfD    = opts.halfD || 0;
+    this.userData = opts.userData || null;
+    this.layer    = opts.layer !== undefined ? opts.layer : 1;
+    this.mask     = opts.mask !== undefined ? opts.mask : -1;
+    this.ignoreGravity = !!opts.ignoreGravity;
+    this.alive = true;
+  }
+  applyImpulse(ix, iy, iz){
+    if (this.isStatic) return;
+    this.velocity.x += ix * this.invMass;
+    this.velocity.y += iy * this.invMass;
+    this.velocity.z += iz * this.invMass;
+  }
+  applyForce(fx, fy, fz){
+    if (this.isStatic) return;
+    this.force.x += fx;
+    this.force.y += fy;
+    this.force.z += fz;
+  }
+}
+
+/* ============================================================
+   [13] PhysicsWorld · 2D 平面物理
+   ------------------------------------------------------------
+   支持：重力、圆-圆碰撞、圆-AABB 碰撞、射线检测（X/Z 平面）
+   不处理 Y 轴碰撞（游戏中地面由 _solveCollisions 最后统一处理）
+   ============================================================ */
+class PhysicsWorld {
+  constructor(opts){
+    opts = opts || {};
+    this.gravity  = opts.gravity || { x: 0, y: -20, z: 0 };
+    this.cellSize = opts.cellSize || 8;
+    this.substeps = opts.substeps || 1;
+    this.bodies        = [];
+    this.dynamicBodies = [];
+    this.staticBodies  = [];
+    this.hash = new SpatialHash(this.cellSize);
+  }
+
+  add(body){
+    this.bodies.push(body);
+    if (body.isStatic) this.staticBodies.push(body);
+    else this.dynamicBodies.push(body);
+    return body;
+  }
+  remove(body){
+    let i = this.bodies.indexOf(body);
+    if (i >= 0) this.bodies.splice(i, 1);
+    i = this.dynamicBodies.indexOf(body);
+    if (i >= 0) this.dynamicBodies.splice(i, 1);
+    i = this.staticBodies.indexOf(body);
+    if (i >= 0) this.staticBodies.splice(i, 1);
+  }
+  clear(){
+    this.bodies.length = 0;
+    this.dynamicBodies.length = 0;
+    this.staticBodies.length = 0;
+    this.hash.clear();
+  }
+
+  step(dt){
+    const sub = Math.max(1, this.substeps);
+    const sdt = dt / sub;
+    for (let s = 0; s < sub; s++) {
+      this._integrate(sdt);
+      this._solveCollisions();
+      this._postStep();
+    }
+  }
+
+  _integrate(dt){
+    const g = this.gravity;
+    for (const b of this.dynamicBodies) {
+      if (b.isStatic || !b.alive) continue;
+      if (!b.ignoreGravity) {
+        b.velocity.x += (g.x + b.force.x * b.invMass) * dt;
+        b.velocity.y += (g.y + b.force.y * b.invMass) * dt;
+        b.velocity.z += (g.z + b.force.z * b.invMass) * dt;
+      } else {
+        b.velocity.x += b.force.x * b.invMass * dt;
+        b.velocity.z += b.force.z * b.invMass * dt;
+      }
+      if (b.friction > 0) {
+        const f = Math.max(0, 1 - b.friction * dt);
+        b.velocity.x *= f;
+        b.velocity.z *= f;
+      }
+      b.position.x += b.velocity.x * dt;
+      b.position.y += b.velocity.y * dt;
+      b.position.z += b.velocity.z * dt;
+      b.force.x = 0; b.force.y = 0; b.force.z = 0;
+    }
+  }
+
+  _canCollide(a, b){
+    if ((a.mask & b.layer) === 0) return false;
+    if ((b.mask & a.layer) === 0) return false;
+    return true;
+  }
+
+  _solveCollisions(){
+    // 动态体之间的圆-圆
+    this.hash.clear();
+    for (const b of this.dynamicBodies) if (b.alive) this.hash.insert(b);
+    for (const a of this.dynamicBodies) {
+      if (!a.alive || a.isStatic) continue;
+      const neighbors = this.hash.queryCircle(a.position.x, a.position.z, a.radius * 2);
+      for (const b of neighbors) {
+        if (a === b || b.isStatic || !b.alive) continue;
+        if (!this._canCollide(a, b)) continue;
+        this._resolveCircleCircle(a, b);
+      }
+    }
+    // 动态-静态
+    for (const a of this.dynamicBodies) {
+      if (!a.alive || a.isStatic) continue;
+      for (const s of this.staticBodies) {
+        if (!s.alive) continue;
+        if (!this._canCollide(a, s)) continue;
+        if (s.shape === 'aabb') this._resolveCircleAABB(a, s);
+        else this._resolveCircleCircle(a, s);
+      }
+    }
+    // 地面（Y 轴）：把所有动态体压到 radius 高度以上
+    for (const a of this.dynamicBodies) {
+      if (!a.alive || a.isStatic) continue;
+      const floor = a.radius;
+      if (a.position.y < floor) {
+        a.position.y = floor;
+        if (a.velocity.y < 0) {
+          a.velocity.y = -a.velocity.y * a.restitution;
+          if (Math.abs(a.velocity.y) < 0.5) a.velocity.y = 0;
+        }
+      }
+    }
+  }
+
+  _resolveCircleCircle(a, b){
+    const dx = b.position.x - a.position.x;
+    const dz = b.position.z - a.position.z;
+    const r  = a.radius + b.radius;
+    const d2 = dx * dx + dz * dz;
+    if (d2 >= r * r || d2 < 1e-9) return false;
+    const d = Math.sqrt(d2);
+    const nx = dx / d, nz = dz / d;
+    const overlap = r - d;
+    const invA = a.invMass, invB = b.invMass;
+    const totalInv = invA + invB;
+    if (totalInv <= 0) return true;
+    const corr = overlap / totalInv;
+    a.position.x -= nx * corr * invA;
+    a.position.z -= nz * corr * invA;
+    b.position.x += nx * corr * invB;
+    b.position.z += nz * corr * invB;
+    const vx = b.velocity.x - a.velocity.x;
+    const vz = b.velocity.z - a.velocity.z;
+    const vn = vx * nx + vz * nz;
+    if (vn > 0) return true;
+    const e = Math.min(a.restitution, b.restitution);
+    const j = -(1 + e) * vn / totalInv;
+    a.velocity.x -= j * nx * invA;
+    a.velocity.z -= j * nz * invA;
+    b.velocity.x += j * nx * invB;
+    b.velocity.z += j * nz * invB;
+    return true;
+  }
+
+  _resolveCircleAABB(c, box){
+    const bx = box.position.x, bz = box.position.z;
+    const minX = bx - box.halfW, maxX = bx + box.halfW;
+    const minZ = bz - box.halfD, maxZ = bz + box.halfD;
+    const cx = clamp(c.position.x, minX, maxX);
+    const cz = clamp(c.position.z, minZ, maxZ);
+    const dx = c.position.x - cx;
+    const dz = c.position.z - cz;
+    const d2 = dx * dx + dz * dz;
+    if (d2 >= c.radius * c.radius) return false;
+    if (d2 < 1e-9) {
+      const dl = c.position.x - minX;
+      const dr = maxX - c.position.x;
+      const dt = c.position.z - minZ;
+      const db = maxZ - c.position.z;
+      const m = Math.min(dl, dr, dt, db);
+      if      (m === dl) { c.position.x = minX - c.radius; c.velocity.x = Math.min(0, c.velocity.x); }
+      else if (m === dr) { c.position.x = maxX + c.radius; c.velocity.x = Math.max(0, c.velocity.x); }
+      else if (m === dt) { c.position.z = minZ - c.radius; c.velocity.z = Math.min(0, c.velocity.z); }
+      else               { c.position.z = maxZ + c.radius; c.velocity.z = Math.max(0, c.velocity.z); }
+      return true;
+    }
+    const d = Math.sqrt(d2);
+    const nx = dx / d, nz = dz / d;
+    const overlap = c.radius - d;
+    c.position.x += nx * overlap;
+    c.position.z += nz * overlap;
+    const vn = c.velocity.x * nx + c.velocity.z * nz;
+    if (vn < 0) {
+      const e = c.restitution;
+      c.velocity.x -= (1 + e) * vn * nx;
+      c.velocity.z -= (1 + e) * vn * nz;
+    }
+    return true;
+  }
+
+  _postStep(){
+    for (let i = this.dynamicBodies.length - 1; i >= 0; i--) {
+      if (!this.dynamicBodies[i].alive) {
+        const b = this.dynamicBodies[i];
+        this.dynamicBodies.splice(i, 1);
+        const bi = this.bodies.indexOf(b);
+        if (bi >= 0) this.bodies.splice(bi, 1);
+      }
+    }
+  }
+
+  /* ---- 射线检测（X/Z 平面，忽略 Y 轴） ---- */
+  raycast(ox, oy, oz, dx, dy, dz, maxDist, filter){
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = dx / len, nz = dz / len;
+    let closestT = maxDist;
+    let closest  = null;
+    for (const b of this.bodies) {
+      if (!b.alive) continue;
+      if (filter && !filter(b)) continue;
+      let t;
+      if (b.shape === 'aabb') t = this._rayAABB(ox, oz, nx, nz, b, closestT);
+      else                    t = this._rayCircle(ox, oz, nx, nz, b, closestT);
+      if (t >= 0 && t < closestT) {
+        closestT = t;
+        closest = { body: b, t, point: { x: ox + nx * t, z: oz + nz * t } };
+      }
+    }
+    return closest;
+  }
+  _rayCircle(ox, oz, dx, dz, c, maxT){
+    const cx = c.position.x - ox;
+    const cz = c.position.z - oz;
+    const t = cx * dx + cz * dz;
+    if (t < 0 || t > maxT) return -1;
+    const px = cx - t * dx;
+    const pz = cz - t * dz;
+    const d2 = px * px + pz * pz;
+    const r2 = c.radius * c.radius;
+    if (d2 > r2) return -1;
+    const thc = Math.sqrt(r2 - d2);
+    const t0 = t - thc;
+    if (t0 >= 0 && t0 <= maxT) return t0;
+    const t1 = t + thc;
+    if (t1 >= 0 && t1 <= maxT) return t1;
+    return -1;
+  }
+  _rayAABB(ox, oz, dx, dz, box, maxT){
+    const minX = box.position.x - box.halfW, maxX = box.position.x + box.halfW;
+    const minZ = box.position.z - box.halfD, maxZ = box.position.z + box.halfD;
+    let tmin = 0, tmax = maxT;
+    if (Math.abs(dx) < 1e-6) {
+      if (ox < minX || ox > maxX) return -1;
+    } else {
+      let t1 = (minX - ox) / dx;
+      let t2 = (maxX - ox) / dx;
+      if (t1 > t2) { const s = t1; t1 = t2; t2 = s; }
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) return -1;
+    }
+    if (Math.abs(dz) < 1e-6) {
+      if (oz < minZ || oz > maxZ) return -1;
+    } else {
+      let t1 = (minZ - oz) / dz;
+      let t2 = (maxZ - oz) / dz;
+      if (t1 > t2) { const s = t1; t1 = t2; t2 = s; }
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) return -1;
+    }
+    return tmin;
+  }
+}
+
+/* ============================================================
+   [14] AudioSystem · 音频（下次实现）
+   ------------------------------------------------------------
+   本次提供接口骨架，等下次写引擎音频模块时填充。
+   ============================================================ */
+class AudioSystem {
+  constructor(engine){
+    this.engine = engine;
+    this.ctx = null;
+    this.master = null;
+    this.enabled = true;
+    this._clips = new Map();
+  }
+  async init(){
+    if (this.ctx) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { this.enabled = false; return; }
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.3;
+      this.master.connect(this.ctx.destination);
+    } catch (e) {
+      console.warn('[Audio] init fail', e);
+      this.enabled = false;
+    }
+  }
+  register(name, buffer){ this._clips.set(name, buffer); }
+  play(name, opts){
+    // TODO: 下次实现
+  }
+  stopAll(){
+    if (this.ctx && this.ctx.state === 'running') this.ctx.suspend();
+  }
+  setVolume(v){
+    if (this.master) this.master.gain.value = clamp(v, 0, 1);
+  }
+}
+
+/* ============================================================
+   [15] Loader · 资源加载（下次实现）
+   ------------------------------------------------------------
+   本次提供接口骨架，等下次接 GLTF / 贴图 / 音频时填充。
+   ============================================================ */
+class Loader {
+  constructor(engine){
+    this.engine = engine;
+    this.cache = new Map();
+    this.pending = new Map();
+  }
+  async loadGLTF(url){
+    throw new Error('[Loader] loadGLTF 尚未实现（下次接 GLTFLoader）');
+  }
+  async loadTexture(url){
+    throw new Error('[Loader] loadTexture 尚未实现');
+  }
+  async loadAudio(url){
+    throw new Error('[Loader] loadAudio 尚未实现');
+  }
+  async loadJSON(url){
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('[Loader] HTTP ' + res.status + ' ' + url);
+    return res.json();
+  }
+}
+
+/* ============================================================
+   [16] DevConsole · 调试控制台
+   ------------------------------------------------------------
+   引擎级默认命令：help / clear / version / lang / content / bodies
+   游戏级命令由 game.js 在 engine.devConsole.register(...) 注册
+   快捷键：反引号 ` 或 ~
+   ============================================================ */
+class DevConsole {
+  constructor(engine){
+    this.engine = engine;
+    this.commands = new Map();
+    this.isOpen = false;
+    this.history = [];
+    this.historyIdx = -1;
+    this._bound = false;
+    this._registerDefaults();
+  }
+
+  _registerDefaults(){
+    this.register('help', {
+      desc: '显示所有命令',
+      fn: () => {
+        const lines = [];
+        for (const [name, cmd] of this.commands) {
+          lines.push('  ' + name.padEnd(12) + (cmd.desc || ''));
+        }
+        return lines.join('\n');
+      }
+    });
+    this.register('clear', { desc: '清空控制台', fn: () => { this._clear(); return ''; } });
+    this.register('version', {
+      desc: '显示引擎版本',
+      fn: () => `LaiAsaka Engine v${this.engine.version}`
+    });
+    this.register('lang', {
+      desc: '切换语言，用法：lang zh-CN / lang en-US',
+      fn: (args) => {
+        const code = args[0];
+        if (!code) return '可用语言：' + [...this.engine.i18n.tables.keys()].join(', ');
+        const ok = this.engine.setLanguage(code);
+        return ok ? `已切换到 ${code}` : `未找到语言 ${code}`;
+      }
+    });
+    this.register('content', {
+      desc: '列出已注册内容，用法：content [表名]',
+      fn: (args) => {
+        const table = args[0];
+        if (!table) {
+          return '内容表：' + this.engine.content.tables.keys
+            ? [...this.engine.content.tables.keys()].map(t => `${t}(${this.engine.content.count(t)})`).join(', ')
+            : '(空)';
+        }
+        const list = this.engine.content.all(table);
+        if (!list.length) return `${table}: 空`;
+        return list.map(x => '  ' + x.id).join('\n');
+      }
+    });
+    this.register('bodies', {
+      desc: '显示物理体数量（需要游戏运行时）',
+      fn: () => {
+        const w = this.engine.app && this.engine.app.world;
+        if (!w || !w.physics) return '当前无运行中的物理世界';
+        const p = w.physics;
+        return `bodies=${p.bodies.length}, dynamic=${p.dynamicBodies.length}, static=${p.staticBodies.length}`;
+      }
+    });
+  }
+
+  register(name, def){
+    this.commands.set(name, { name, ...def });
+  }
+
+  _bind(){
+    if (this._bound) return;
+    this._bound = true;
+    const input = $('dc-input');
+    const closeBtn = $('dc-close');
+    if (closeBtn) closeBtn.addEventListener('click', () => this.close());
+    if (input) {
+      input.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+          const val = input.value;
+          input.value = '';
+          if (val.trim()) {
+            this.history.push(val);
+            if (this.history.length > 100) this.history.shift();
+            this.historyIdx = this.history.length;
+            this.exec(val);
+          }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (this.historyIdx > 0) {
+            this.historyIdx--;
+            input.value = this.history[this.historyIdx] || '';
+          }
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (this.historyIdx < this.history.length - 1) {
+            this.historyIdx++;
+            input.value = this.history[this.historyIdx] || '';
+          } else {
+            this.historyIdx = this.history.length;
+            input.value = '';
+          }
+        }
+      });
+    }
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '`' || e.key === '~') {
+        const tag = e.target && e.target.tagName ? e.target.tagName.toUpperCase() : '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        e.preventDefault();
+        this.toggle();
+      } else if (e.key === 'Escape' && this.isOpen) {
+        e.preventDefault();
+        this.close();
+      }
+    });
+  }
+
+  toggle(){
+    const el = $('dev-console');
+    if (!el) return;
+    if (this.isOpen) this.close();
+    else this.open();
+  }
+  open(){
+    const el = $('dev-console');
+    if (!el) return;
+    el.classList.add('on');
+    this.isOpen = true;
+    const input = $('dc-input');
+    if (input) setTimeout(() => input.focus(), 30);
+  }
+  close(){
+    const el = $('dev-console');
+    if (!el) return;
+    el.classList.remove('on');
+    this.isOpen = false;
+  }
+
+  log(text, cls){
+    const out = $('dc-out');
+    if (!out) return;
+    const line = document.createElement('div');
+    line.className = 'line ' + (cls || '');
+    line.textContent = text;
+    out.appendChild(line);
+    out.scrollTop = out.scrollHeight;
+    while (out.children.length > 400) out.removeChild(out.firstChild);
+  }
+
+  _clear(){
+    const out = $('dc-out');
+    if (out) out.innerHTML = '';
+  }
+
+  exec(raw){
+    const str = (raw || '').trim();
+    if (!str) return;
+    this.log('› ' + str, 'cmd');
+    const parts = str.split(/\s+/);
+    const name = parts[0].toLowerCase();
+    const args = parts.slice(1);
+    const cmd = this.commands.get(name);
+    if (!cmd) {
+      this.log('未知命令：' + name + '（输入 help 查看）', 'err');
+      return;
+    }
+    try {
+      const result = cmd.fn(args);
+      if (typeof result === 'string' && result.length) this.log(result);
+    } catch (e) {
+      this.log('错误：' + (e && e.message ? e.message : String(e)), 'err');
+    }
+  }
+}
+
+/* ============================================================
+   [17] ModeRegistry · 模式注册表
+   ------------------------------------------------------------
+   模式是"这一局怎么玩"的集合（straight / asaka / 未来更多）
+   每个模式可以：
+     - 声明要启用的 systems 列表
+     - setup(world)  / teardown(world)
+     - 声明 hooks：onMatchStart / onPlayerSpawn / onEnemyKilled /
+                   onPlayerDowned / onExtractStart / onMatchEnd
+   ============================================================ */
+class ModeRegistry {
+  constructor(){ this.modes = new Map(); }
+  register(id, spec){
+    if (this.modes.has(id)) console.warn('[Mode] 重复注册:', id);
+    this.modes.set(id, Object.freeze({ id, ...spec }));
+  }
+  get(id){ return this.modes.get(id); }
+  has(id){ return this.modes.has(id); }
+  all(){ return Array.from(this.modes.values()); }
+}
+
+/* ============================================================
+   [18] Engine · 总装
+   ============================================================ */
+
+/* 内置最小中文 fallback（locale 文件缺失时使用） */
+const BUILTIN_LOCALE_ZH = {
+  'engine.title': 'LaiAsaka',
+  'engine.subtitle': 'ENGINE',
+  'engine.copyright': '© 2026 <b>ZpycuA</b> · Licensed under <b>CC BY-NC 4.0</b>',
+  'ui.boot.loading': '正在初始化引擎…',
+  'ui.menu.title': 'Asaka Straight Project',
+  'ui.menu.subtitle': 'LaiAsaka Engine',
+  'ui.menu.start': '进 入 战 区',
+  'ui.menu.train': '训 练 场',
+  'ui.game.task_title': '📋 任务',
+  'ui.game.hp': '生命',
+  'ui.game.cp': '耦合',
+  'ui.game.protect_l1': '冷兵器',
+  'ui.game.protect_l2': '+热兵器',
+  'ui.game.protect_l3': '全防护',
+  'ui.game.extract_progress': '撤 离 中',
+  'ui.pause.title': '暂 停',
+  'ui.pause.resume': '继续',
+  'ui.pause.quit': '放弃并返回',
+  'ui.result.extract_success': '撤 离 成 功',
+  'ui.result.operation_failed': '作 战 失 败',
+  'ui.result.again': '再来一次',
+  'ui.result.menu': '返回菜单',
+  'ui.console.title': 'DEV CONSOLE · 输入 help 查看命令',
+  'ui.console.placeholder': 'help',
+};
+
+class Engine {
+  constructor(){
+    this.name    = 'LaiAsaka';
+    this.version = '3.0.0';
+    this.author  = 'ZpycuA';
+    this.license = 'CC BY-NC 4.0';
+
+    this.bus         = new EventBus();
+    this.input       = new InputSystem();
+    this.i18n        = new I18nSystem();
+    this.content     = new ContentRegistry();
+    this.save        = new SaveSystem('LaiAsaka_Save_v3');
+    this.meshes      = new MeshFactory();
+    this.modeRegistry = new ModeRegistry();
+    this.devConsole  = new DevConsole(this);
+    this.loader      = new Loader(this);
+    this.audio       = new AudioSystem(this);
+
+    this.renderer = null;
+    this.scenes   = null;
+    this.loop     = null;
+    this.app      = null;
+
+    this.currentLanguage = 'zh-CN';
+  }
+
+  async init({ canvas, locale, defaultLocale }){
+    // ---- 1. 语言 ----
+    const loadedLocales = locale || {};
+    for (const [code, table] of Object.entries(loadedLocales)) {
+      this.i18n.register(code, table);
+    }
+    if (!this.i18n.tables.size) {
+      this.i18n.register('zh-CN', BUILTIN_LOCALE_ZH);
+    }
+    const defCode = defaultLocale || (this.i18n.hasLanguage('zh-CN') ? 'zh-CN' : [...this.i18n.tables.keys()][0]);
+    this.i18n.setFallback(this.i18n.tables.get(defCode) || BUILTIN_LOCALE_ZH);
+    this.i18n.setLanguage(defCode);
+    this.currentLanguage = defCode;
+    this.i18n.applyToDOM(document);
+
+    // ---- 2. 输入 ----
+    if (canvas) this.input.attach(canvas);
+
+    // ---- 3. 渲染 ----
+    this.renderer = new Renderer3D(canvas);
+    this.scenes   = new SceneManager(this.renderer);
+
+    // ---- 4. 主循环 ----
+    this.loop = new FixedLoop({
+      step: 1/60,
+      maxSteps: 4,
+      onStep: (dt) => {
+        if (this.scenes) this.scenes.update(dt);
+        if (this.app && this.app.world && this.app.world.running &&
+            typeof this.app.world.update === 'function') {
+          try { this.app.world.update(dt); }
+          catch (e) { console.error('[Engine] world.update err:', e); }
+        }
+        this.bus.emit('step', dt);
+      },
+      onRender: (alpha) => {
+        if (this.scenes) this.scenes.render(alpha);
+        else if (this.renderer) this.renderer.render();
+        this.bus.emit('render', alpha);
+      }
+    });
+
+    // ---- 5. 控制台 ----
+    this.devConsole._bind();
+
+    // ---- 6. 输入动作（引擎级默认） ----
+    this.input.registerAction('fire',   { mouse: 'left' });
+    this.input.registerAction('reload', { keys: ['r'] });
+    this.input.registerAction('pause',  { keys: ['escape'] });
+
+    // ---- 7. 音频初始化（延迟到首次输入） ----
+    const initAudioOnce = () => { this.audio.init(); window.removeEventListener('pointerdown', initAudioOnce); };
+    window.addEventListener('pointerdown', initAudioOnce, { once: true });
+
+    return this;
+  }
+
+  /* --- 物理工厂 --- */
+  physicsFactory(){
+    return new PhysicsWorld({
+      gravity: { x: 0, y: -20, z: 0 },
+      cellSize: 8,
+      substeps: 1,
+    });
+  }
+
+  /* --- 主循环 --- */
+  start(){
+    if (!this.loop) { console.warn('[Engine] 未初始化，不能 start()'); return; }
+    this.loop.start();
+  }
+  stop(){
+    if (this.loop) this.loop.stop();
+  }
+
+  /* --- 语言 --- */
+  setLanguage(code){
+    if (!this.i18n.hasLanguage(code)) {
+      console.warn('[Engine] 未加载语言:', code);
+      return false;
+    }
+    this.i18n.setLanguage(code);
+    this.currentLanguage = code;
+    this.i18n.applyToDOM(document);
+    this.bus.emit('languageChanged', code);
+    return true;
+  }
+
+  /* --- 事件转发（快捷） --- */
+  on(name, fn){ return this.bus.on(name, fn); }
+  emit(name, payload){ this.bus.emit(name, payload); }
+}
+
+/* ============================================================
+   [19] 导出
+   ============================================================ */
+export {
+  Engine,
+  EventBus,
+  ObjectPool,
+  SpatialHash,
+  FixedLoop,
+  I18nSystem,
+  ContentRegistry,
+  SaveSystem,
+  InputSystem,
+  Renderer3D,
+  MeshFactory,
+  SceneManager,
+  Body,
+  PhysicsWorld,
+  AudioSystem,
+  Loader,
+  DevConsole,
+  ModeRegistry,
+  Utils,
+};

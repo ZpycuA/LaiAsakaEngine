@@ -1,0 +1,1 @@
+export class GameApp { constructor(engine) { this.engine = engine; } boot() {} setLanguage() {} startMatch() {} }
