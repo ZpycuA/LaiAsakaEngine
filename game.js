@@ -445,14 +445,9 @@ _updateHurtFX(hpPct) {
 _renderMinimap(){
   const canvas = document.getElementById('minimap');
   if (!canvas) return;
-  const mapContainer = document.getElementById('minimap-container');
-  if (mapContainer) mapContainer.style.display = 'block';
-
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
-  
-  // 黑色底
   ctx.fillStyle = 'rgba(8,14,22,0.9)';
   ctx.fillRect(0, 0, w, h);
 
@@ -464,12 +459,35 @@ _renderMinimap(){
   const cx = w/2, cy = h/2;
   const px = p.body.position.x, pz = p.body.position.z;
 
-  // 绘制玩家（中心点）
+  // ★ 渲染所有兴趣点 (POI)
+  for (const poi of this.world.pois) {
+    const sx = cx + (poi.x - px) * scale;
+    const sy = cy + (poi.z - pz) * scale;
+    
+    // 屏幕外剔除
+    if (sx < -10 || sx > w+10 || sy < -10 || sy > h+10) continue;
+
+    if (poi.type === 'obstacle') {
+      ctx.fillStyle = poi.color;
+      ctx.fillRect(sx - (poi.w * scale)/2, sy - (poi.h * scale)/2, poi.w * scale, poi.h * scale);
+    } else if (poi.type === 'extract') {
+      ctx.fillStyle = poi.color;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (poi.type === 'container') {
+      // 画个小方块代表容器
+      ctx.fillStyle = poi.color;
+      ctx.fillRect(sx - 2, sy - 2, 4, 4);
+    }
+  }
+
+  // 绘制玩家（始终在中心）
   ctx.fillStyle = '#7fe0ff';
   ctx.beginPath();
   ctx.arc(cx, cy, 4, 0, Math.PI * 2);
   ctx.fill();
-
+  
   // 玩家朝向线
   ctx.strokeStyle = 'rgba(120,225,255,0.8)';
   ctx.lineWidth = 2;
@@ -477,19 +495,6 @@ _renderMinimap(){
   ctx.moveTo(cx, cy);
   ctx.lineTo(cx + Math.sin(this.engine.cameraCtl.yaw) * 12, cy - Math.cos(this.engine.cameraCtl.yaw) * 12);
   ctx.stroke();
-
-  // 绘制敌人
-  ctx.fillStyle = '#ff5a5a';
-  for (const e of this.world.enemies) {
-    if (!e.alive) continue;
-    const ex = cx + (e.body.position.x - px) * scale;
-    const ey = cy + (e.body.position.z - pz) * scale;
-    if (ex >= 0 && ex <= w && ey >= 0 && ey <= h) {
-      ctx.beginPath();
-      ctx.arc(ex, ey, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
 }
 
 _renderDamageIndicator(){
