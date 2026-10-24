@@ -1638,6 +1638,12 @@ _addKillFeed(name, dmg, dist) {
     this._playSFX('skill');
   }
 
+   this.combatLog.push({
+  type: 'skill_use', t: this.time,
+  name: this.engine.i18n.t(sk.def.name),
+  detail: '',
+});
+   
   _applySkillEffect(p, def){
     switch (def.kind) {
       case 'dash': {
