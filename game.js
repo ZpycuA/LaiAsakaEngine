@@ -949,54 +949,55 @@ class GameWorld {
   }
 
     _fireWeapon(owner, weapon, isPlayer){
-    if (!weapon || !weapon.def) return;
-    const def = weapon.def;
-    const ammo = weapon.ammoDef;
-    if (!ammo) return;
+  if (!weapon || !weapon.def) return;
+  const def = weapon.def;
+  const ammo = weapon.ammoDef;
+  if (!ammo) return;
 
-    if (isPlayer) owner.fireCd = 60 / def.rpm;
-    else owner.fireCd = 60 / def.rpm * (0.9 + Math.random() * 0.4);
+  if (isPlayer) owner.fireCd = 60 / def.rpm;
+  else owner.fireCd = 60 / def.rpm * (0.9 + Math.random() * 0.4);
 
-    if (isPlayer) { weapon.mag--; this.stats.shots++; }
+  if (isPlayer) { weapon.mag--; this.stats.shots++; }
 
-    const baseSpread = def.spread || 0.02;
-    const acc = isPlayer ? 1.0 : (owner.spec ? owner.spec.acc : 0.5);
-    const spread = baseSpread * (isPlayer ? 1 : (1.5 - acc));
+  const baseSpread = def.spread || 0.02;
+  const acc = isPlayer ? 1.0 : (owner.spec ? owner.spec.acc : 0.5);
+  const spread = baseSpread * (isPlayer ? 1 : (1.5 - acc));
 
-    const baseEnergy = CombatSystem.kinetic(ammo.massG, ammo.v0);
-    const range = (def.range || 50) * 10;
+  const baseEnergy = CombatSystem.kinetic(ammo.massG, ammo.v0);
+  const range = (def.range || 50) * 10;
 
-    if (isPlayer && this.engine.profile.get('combat.realisticRecoil', false)) {
-      const rec = def.recoil || 1;
-      this.engine.cameraCtl.shake(0.25 * rec, 0.05);
-    }
-
-    const pellets = def.pellets || 1;
-    
-    if (isPlayer) {
-      // ★ 玩家使用相机朝向射击
-      const cam = this.engine.renderer.camera;
-      const dir = new THREE.Vector3();
-      cam.getWorldDirection(dir);
-      
-      for (let i = 0; i < pellets; i++) {
-        const a = Math.atan2(dir.z, dir.x) + (Math.random() * 2 - 1) * spread;
-        const dX = Math.cos(a);
-        const dZ = Math.sin(a);
-        this._raycastBullet(owner, dX, dZ, baseEnergy, range, def, ammo, true);
-      }
-    } else {
-      // 敌人使用自身朝向射击
-      for (let i = 0; i < pellets; i++) {
-        const a = owner.angle + (Math.random() * 2 - 1) * spread;
-        const dX = Math.cos(a);
-        const dZ = Math.sin(a);
-        this._raycastBullet(owner, dX, dZ, baseEnergy, range, def, ammo, false);
-      }
-    }
-
-    this._playSFX('shot_' + def.cls, { volume: 0.6 });
+  if (isPlayer && this.engine.profile.get('combat.realisticRecoil', false)) {
+    const rec = def.recoil || 1;
+    this.engine.cameraCtl.shake(0.25 * rec, 0.05);
   }
+
+  const pellets = def.pellets || 1;
+  
+  if (isPlayer) {
+    const cam = this.engine.renderer.camera;
+    const dir = new THREE.Vector3();
+    cam.getWorldDirection(dir);
+    
+    // 提取完整的 3D 方向向量
+    for (let i = 0; i < pellets; i++) {
+      const spreadX = (Math.random() * 2 - 1) * spread;
+      const spreadY = (Math.random() * 2 - 1) * spread;
+      const dX = dir.x + spreadX;
+      const dY = dir.y + spreadY;
+      const dZ = dir.z + spreadX;
+      // 归一化
+      const len = Math.hypot(dX, dY, dZ) || 1;
+      this._raycastBullet(owner, dX/len, dY/len, dZ/len, baseEnergy, range, def, ammo, true);
+    }
+  } else {
+    for (let i = 0; i < pellets; i++) {
+      const a = owner.angle + (Math.random() * 2 - 1) * spread;
+      this._raycastBullet(owner, Math.cos(a), 0, Math.sin(a), baseEnergy, range, def, ammo, false);
+    }
+  }
+
+  this._playSFX('shot_' + def.cls, { volume: 0.6 });
+}
 
     _raycastBullet(owner, dirX, dirZ, baseEnergy, range, weaponDef, ammoDef, isPlayer){
     const px = owner.body.position.x;
