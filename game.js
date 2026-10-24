@@ -2169,6 +2169,8 @@ _bindCameraControls() {
     
     // 映射到真正的输入状态
     const actionId = btn.id === 'fire_left' ? 'fire' : btn.id;
+    el.style.pointerEvents = 'auto'; // 允许按钮被点击
+    el.style.touchAction = 'none';   // 阻止浏览器的默认触摸行为
 
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault(); e.stopPropagation();
