@@ -953,7 +953,7 @@ _updatePlayer(dt){
     p.reloading = 0;
   }
 
-    _fireWeapon(owner, weapon, isPlayer){
+ _fireWeapon(owner, weapon, isPlayer){
   if (!weapon || !weapon.def) return;
   const def = weapon.def;
   const ammo = weapon.ammoDef;
@@ -983,14 +983,12 @@ _updatePlayer(dt){
     const dir = new THREE.Vector3();
     cam.getWorldDirection(dir);
     
-    // 提取完整的 3D 方向向量
     for (let i = 0; i < pellets; i++) {
       const spreadX = (Math.random() * 2 - 1) * spread;
       const spreadY = (Math.random() * 2 - 1) * spread;
       const dX = dir.x + spreadX;
       const dY = dir.y + spreadY;
       const dZ = dir.z + spreadX;
-      // 归一化
       const len = Math.hypot(dX, dY, dZ) || 1;
       this._raycastBullet(owner, dX/len, dY/len, dZ/len, baseEnergy, range, def, ammo, true);
     }
