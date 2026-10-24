@@ -792,76 +792,80 @@ class GameWorld {
     }
   }
 
-    _updatePlayer(dt){
-    const p = this.player;
-    if (!p || !p.alive) return;
+   _updatePlayer(dt){
+  const p = this.player;
+  if (!p || !p.alive) return;
 
-    const e = this.engine;
+  const e = this.engine;
 
-    // 处理移动端右摇杆转视角
-    if (e.input.joystickRight && e.input.joystickRight.visible) {
-      const v = e.input.joystickRight.vector;
-      if (v.magnitude > 0.1) {
-        e.cameraCtl.rotate(v.x * dt * 300, v.y * dt * 300);
-      }
+  // 修复：右摇杆灵敏度从 300 提升到 600
+  if (e.input.joystickRight && e.input.joystickRight.visible) {
+    const v = e.input.joystickRight.vector;
+    if (v.magnitude > 0.1) {
+      e.cameraCtl.rotate(v.x * dt * 600, v.y * dt * 600);
     }
-
-    const mv = e.input.getMoveVector();
-    const baseSpeed = p.charSpec.speed * (p.speedMul !== undefined ? p.speedMul : 1);
-    const isSprinting = e.input.keys.has('shift') || e.input.keys.has('shiftleft');
-    
-    // 第一人称移动
-    const forwardX = Math.sin(e.cameraCtl.yaw);
-    const forwardZ = -Math.cos(e.cameraCtl.yaw);
-    const rightX = Math.cos(e.cameraCtl.yaw);
-    const rightZ = Math.sin(e.cameraCtl.yaw);
-
-    let moveX = rightX * mv.x + forwardX * -mv.z;
-    let moveZ = rightZ * mv.x + forwardZ * -mv.z;
-
-    const speed = isSprinting ? baseSpeed * 1.5 : baseSpeed;
-    p.body.velocity.x = moveX * speed;
-    p.body.velocity.z = moveZ * speed;
-
-    // 跳跃保护
-    const jumpPressed = e.input.keys.has(' ') || e.input.isActive('jump');
-    if (jumpPressed && p.body.position.y <= p.body.radius + 0.1) {
-      p.body.velocity.y = 12;
-    }
-
-    // 角色永远面朝相机前方
-    p.angle = e.cameraCtl.yaw;
-
-    this._updateProtection(dt);
-
-    for (const sk of p.skills) {
-      if (!sk.ready) {
-        sk.cd -= dt;
-        if (sk.cd <= 0) { sk.ready = true; sk.cd = 0; }
-      }
-    }
-
-    if (p.reloading > 0) {
-      p.reloading -= dt;
-      if (p.reloading <= 0) this._finishReload();
-    } else {
-      if (p.fireCd > 0) p.fireCd -= dt;
-      if (e.input.isActive('fire') && p.fireCd <= 0 && p.weapon) {
-        if (p.weapon.mag <= 0) this._startReload();
-        else this._fireWeapon(p, p.weapon, true);
-      }
-    }
-
-    if (e.input.isActive('reload')) this._startReload();
-    if (e.input.isActive('switchWeapon') && p.sidearm) this._switchWeapon();
-    if (e.input.isActive('skill1')) this._useSkill(0);
-    if (e.input.isActive('skill2')) this._useSkill(1);
-    if (e.input.isActive('search')) this._trySearchContainer();
-
-    const half = this.mapSpec.size / 2 - 1;
-    p.body.position.x = Math.max(-half, Math.min(half, p.body.position.x));
-    p.body.position.z = Math.max(-half, Math.min(half, p.body.position.z));
   }
+
+  const mv = e.input.getMoveVector();
+  const baseSpeed = p.charSpec.speed * (p.speedMul !== undefined ? p.speedMul : 1);
+  const isSprinting = e.input.keys.has('shift') || e.input.keys.has('shiftleft');
+  
+  // 第一人称移动
+  const forwardX = Math.sin(e.cameraCtl.yaw);
+  const forwardZ = -Math.cos(e.cameraCtl.yaw);
+  const rightX = Math.cos(e.cameraCtl.yaw);
+  const rightZ = Math.sin(e.cameraCtl.yaw);
+
+  let moveX = rightX * mv.x + forwardX * -mv.z;
+  let moveZ = rightZ * mv.x + forwardZ * -mv.z;
+
+  const speed = isSprinting ? baseSpeed * 1.5 : baseSpeed;
+  p.body.velocity.x = moveX * speed;
+  p.body.velocity.z = moveZ * speed;
+  
+  // ★ 修复：只要动了，就强行唤醒
+  if (moveX !== 0 || moveZ !== 0) p.body.wake();
+
+  // 跳跃保护
+  const jumpPressed = e.input.keys.has(' ') || e.input.isActive('jump');
+  if (jumpPressed && p.body.position.y <= p.body.radius + 0.1) {
+    p.body.velocity.y = 12;
+    p.body.wake(); // ★ 修复：跳跃也要唤醒
+  }
+
+  // 角色永远面朝相机前方
+  p.angle = e.cameraCtl.yaw;
+
+  this._updateProtection(dt);
+
+  for (const sk of p.skills) {
+    if (!sk.ready) {
+      sk.cd -= dt;
+      if (sk.cd <= 0) { sk.ready = true; sk.cd = 0; }
+    }
+  }
+
+  if (p.reloading > 0) {
+    p.reloading -= dt;
+    if (p.reloading <= 0) this._finishReload();
+  } else {
+    if (p.fireCd > 0) p.fireCd -= dt;
+    if (e.input.isActive('fire') && p.fireCd <= 0 && p.weapon) {
+      if (p.weapon.mag <= 0) this._startReload();
+      else this._fireWeapon(p, p.weapon, true);
+    }
+  }
+
+  if (e.input.isActive('reload')) this._startReload();
+  if (e.input.isActive('switchWeapon') && p.sidearm) this._switchWeapon();
+  if (e.input.isActive('skill1')) this._useSkill(0);
+  if (e.input.isActive('skill2')) this._useSkill(1);
+  if (e.input.isActive('search')) this._trySearchContainer();
+
+  const half = this.mapSpec.size / 2 - 1;
+  p.body.position.x = Math.max(-half, Math.min(half, p.body.position.x));
+  p.body.position.z = Math.max(-half, Math.min(half, p.body.position.z));
+}
 
   _updateProtection(dt){
     const p = this.player;
