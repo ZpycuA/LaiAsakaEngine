@@ -1544,6 +1544,10 @@ _addKillFeed(name, dmg, dist) {
           ex.active = true;
           this._processModeHook('onExtractStart', ex);
           this._log(this.engine.i18n.t('log.extract_started'), 'p');
+           this.combatLog.push({
+  type: 'extract', t: this.time,
+  pointName: (ex.x.toFixed(0) + ',' + ex.z.toFixed(0)),
+});
         }
         if (ex.timer >= COMBAT.EXTRACT_TIME) {
           this._log(this.engine.i18n.t('log.extract_complete'), 'g');
