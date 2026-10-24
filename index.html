@@ -227,6 +227,24 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
         <div class="option on" data-value="auto"><div class="opt-title">自动识别</div></div>
         <div class="option" data-value="pc"><div class="opt-title">PC端 (键鼠)</div></div>
         <div class="option" data-value="mobile"><div class="opt-title">移动端 (触屏)</div></div>
+        <!-- 陀螺仪设置 -->
+<div class="section">
+  <div class="section-label">
+    <span>陀螺仪设置</span>
+    <span class="hint">仅移动端生效</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;padding:8px;background:var(--panel);border-radius:10px;border:1px solid var(--line2);">
+    <div class="opt" id="btn-gyro-toggle" style="padding:10px 14px;text-align:left;display:flex;justify-content:space-between;align-items:center;">
+      <span>启用陀螺仪视角</span>
+      <span id="gyro-status" style="color:var(--dim2);font-size:11px;">未开启</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding:0 14px;">
+      <span style="font-size:11px;color:var(--dim);">灵敏度</span>
+      <input type="range" id="gyro-sensitivity" min="0.1" max="3.0" step="0.1" value="1.0" style="flex:1;cursor:pointer;">
+      <span id="gyro-sens-val" style="font-size:11px;color:var(--accent);width:26px;text-align:right;">1.0</span>
+    </div>
+  </div>
+</div>
       </div>
     </div>
 
