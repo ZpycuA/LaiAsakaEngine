@@ -1195,24 +1195,37 @@ _updatePlayer(dt){
   const pellets = def.pellets || 1;
   
   if (isPlayer) {
-    // ★ 玩家射击：获取相机的真实位置和朝向，保证绝对指哪打哪
-    const cam = this.engine.renderer.camera;
-    const camPos = new THREE.Vector3();
-    cam.getWorldPosition(camPos);
-    const dir = new THREE.Vector3();
-    cam.getWorldDirection(dir);
+  // ★ 后坐力视觉表现：枪模后缩
+  if (owner.weaponGroup) {
+    owner.weaponGroup.position.z = -0.3; // 向后缩
+    setTimeout(() => {
+      if (owner.weaponGroup) owner.weaponGroup.position.z = -0.4; // 恢复
+    }, 50);
+  }
+
+  const cam = this.engine.renderer.camera;
+  const camPos = new THREE.Vector3();
+  cam.getWorldPosition(camPos);
+  const dir = new THREE.Vector3();
+  cam.getWorldDirection(dir);
+  
+  // 计算枪口的绝对世界坐标（基于相机偏移）
+  const muzzleOffset = new THREE.Vector3(0.25, -0.15, -0.8); // 相对相机的偏移
+  muzzleOffset.applyQuaternion(cam.quaternion);
+  const muzzlePos = camPos.clone().add(muzzleOffset);
+
+  for (let i = 0; i < pellets; i++) {
+    const spreadX = (Math.random() * 2 - 1) * spread;
+    const spreadY = (Math.random() * 2 - 1) * spread;
+    const dX = dir.x + spreadX;
+    const dY = dir.y + spreadY;
+    const dZ = dir.z + spreadX;
+    const len = Math.hypot(dX, dY, dZ) || 1;
     
-    for (let i = 0; i < pellets; i++) {
-      const spreadX = (Math.random() * 2 - 1) * spread;
-      const spreadY = (Math.random() * 2 - 1) * spread;
-      const dX = dir.x + spreadX;
-      const dY = dir.y + spreadY;
-      const dZ = dir.z + spreadX;
-      const len = Math.hypot(dX, dY, dZ) || 1;
-      // 从相机位置出发
-      this._raycastBullet(owner, camPos.x, camPos.y, camPos.z, dX/len, dY/len, dZ/len, baseEnergy, range, def, ammo, true);
-    }
-  } else {
+    // 从枪口坐标出发，方向依然是准星方向
+    this._raycastBullet(owner, muzzlePos.x, muzzlePos.y, muzzlePos.z, dX/len, dY/len, dZ/len, baseEnergy, range, def, ammo, true);
+  }
+} else {
     // 敌人射击：从胸口高度出发
     const sy = owner.body.position.y + 1.2;
     for (let i = 0; i < pellets; i++) {
