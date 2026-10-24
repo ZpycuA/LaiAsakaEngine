@@ -1778,7 +1778,7 @@ export class GameApp {
     }
   }
 
-    _onMatchEnd(success, stats){
+      _onMatchEnd(success, stats){
     try {
       const e = this.engine;
       const save = e.save;
@@ -1804,10 +1804,11 @@ export class GameApp {
       title.textContent = e.i18n.t(success ? 'ui.result.extract_success' : 'ui.result.operation_failed');
       title.className = success ? 'success' : 'fail';
 
+      // 给所有 stats 属性加空值保护
       const statLines = [
-        `击杀：<b>${stats.kills}</b>　命中率：<b>${stats.accuracy}%</b>`,
-        `造成伤害：<b>${stats.dealt}</b>　承受伤害：<b>${stats.taken}</b>`,
-        `存活：<b>${stats.time}s</b>　携带物资：<b>${stats.carriedValue} cp</b>`,
+        `击杀：<b>${stats.kills || 0}</b>　命中率：<b>${stats.accuracy || 0}%</b>`,
+        `造成伤害：<b>${stats.dealt || 0}</b>　承受伤害：<b>${stats.taken || 0}</b>`,
+        `存活：<b>${stats.time || 0}s</b>　携带物资：<b>${stats.carriedValue || 0} cp</b>`,
         `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(120,180,240,.2);color:var(--dim)">
           难度：<b>${e.i18n.t(assessment.label)}</b> (${Math.round(assessment.score * 100)}/100)　奖励倍率：<b>×${assessment.rewardMul}</b>
         </div>`,
@@ -1823,8 +1824,7 @@ export class GameApp {
       e.bus.emit('matchEnded', { success, stats, reward: finalReward, assessment });
     } catch (err) {
       console.error('[GameApp] 结算出错:', err);
-      alert('结算出错，请返回菜单');
-      this._quitToMenu();
+      document.getElementById('result-screen').classList.add('on');
     }
   }
 
