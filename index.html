@@ -300,21 +300,26 @@ canvas{display:block;position:absolute;top:0;left:0;width:100vw;height:100vh;}
 
     <!-- 玩家面板 -->
     <div id="bottom-left">
-      <div class="player-panel">
-        <div class="player-name">
-          <span id="player-name">—</span>
-          <span class="tag" id="player-tag">—</span>
-        </div>
-        <div class="stat-row">
-          <span data-i18n="ui.game.hp">生命</span>
-          <div class="bar"><div id="hp-bar"></div><span id="hp-text">100%</span></div>
-        </div>
-        <div class="stat-row" id="cp-row">
-          <span data-i18n="ui.game.cp">耦合</span>
-          <div class="bar cp"><div id="cp-bar"></div><span id="cp-text">100%</span></div>
-        </div>
-      </div>
+  <div class="player-panel">
+    <div class="player-name">
+      <span id="player-name">—</span>
+      <span class="tag" id="player-tag">—</span>
     </div>
+    <div class="stat-row">
+      <span data-i18n="ui.game.hp">生命</span>
+      <div class="bar"><div id="hp-bar"></div><span id="hp-text">100%</span></div>
+    </div>
+    <!-- 新增体力条 -->
+    <div class="stat-row" style="margin-top:4px">
+      <span style="color:#ffd93d">体力</span>
+      <div class="bar" style="height:6px"><div id="stamina-bar" style="background:linear-gradient(90deg,#ffd93d,#fff08a);width:100%"></div></div>
+    </div>
+    <div class="stat-row" id="cp-row">
+      <span data-i18n="ui.game.cp">耦合</span>
+      <div class="bar cp"><div id="cp-bar"></div><span id="cp-text">100%</span></div>
+    </div>
+  </div>
+</div>
 
     <!-- 武器 / 弹药 -->
     <div id="bottom-right">
