@@ -1734,12 +1734,20 @@ export class GameApp {
     });
   }
 
-    startMatch(kind){
+      startMatch(kind){
     const e = this.engine;
     this._lastMatchKind = kind;
 
-    if ('ontouchstart' in window) {
+    // ★ 识别平台
+    let isMobile = this.platform === 'mobile';
+    if (this.platform === 'auto') isMobile = 'ontouchstart' in window;
+    
+    if (isMobile) {
       e.input.enableVirtualJoysticks = true;
+      document.getElementById('crosshair').style.display = 'block';
+    } else {
+      e.input.enableVirtualJoysticks = false;
+      document.getElementById('crosshair').style.display = 'block';
     }
 
     this._bindCameraControls();
