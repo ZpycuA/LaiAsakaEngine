@@ -1285,9 +1285,9 @@ class GameWorld {
     }
   }
 
-  _spawnTracer(x1, z1, x2, z2, color){
+  _spawnTracer(x1, y1, z1, x2, y2, z2, color){
     const geo = new THREE.BufferGeometry();
-    const positions = new Float32Array([x1, 1.2, z1, x2, 1.2, z2]);
+    const positions = new Float32Array([x1, y1, z1, x2, y2, z2]);
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8 });
     const line = new THREE.Line(geo, mat);
@@ -1308,9 +1308,9 @@ class GameWorld {
     }
   }
 
-  _spawnSpark(x, z){
+ _spawnSpark(x, y, z){
     const mesh = this.engine.meshes.build('spark', { color: 0xffaa44 });
-    mesh.position.set(x, 1.2, z);
+    mesh.position.set(x, y, z);
     this.engine.renderer.scene.add(mesh);
     setTimeout(() => {
       this.engine.renderer.scene.remove(mesh);
