@@ -1559,7 +1559,7 @@ export class GameApp {
     this._renderOptions('char-options', e.content.all('characters'), (i) => i.id === this.menuState.char, (i) => ({ title: i18n.t(i.name), sub: i18n.t(i.tag), tag: i.weapon, value: i.id }), (i) => { this.menuState.char = i.id; });
     this._renderOptions('profile-options', e.profile.list(), (i) => i.id === this.menuState.profile, (i) => ({ title: i18n.t(i.name), sub: i18n.t(i.desc || ''), tag: '', value: i.id }), (i) => { this.menuState.profile = i.id; e.profile.setProfile(i.id); this._updateDifficultyDisplay(); });
 
-    // ★ 平台选择绑定
+    // 平台选择绑定
     const platEl = document.getElementById('platform-options');
     if (platEl) {
       platEl.querySelectorAll('.option').forEach(el => {
