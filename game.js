@@ -410,21 +410,19 @@ _updateHurtFX(hpPct) {
   const filterEl = document.getElementById('fx-filter');
   const vignetteEl = document.getElementById('fx-vignette');
   
-  if (hpPct > 75) {
+  if (hpPct > 70) {
     filterEl.style.backdropFilter = 'none';
     vignetteEl.style.opacity = 0;
-  } else if (hpPct > 50) {
-    filterEl.style.backdropFilter = 'blur(1px) grayscale(0.2)';
-    vignetteEl.style.opacity = 0.2;
-  } else if (hpPct > 25) {
-    filterEl.style.backdropFilter = 'blur(2px) grayscale(0.5) contrast(1.2)';
-    vignetteEl.style.opacity = 0.5;
+  } else if (hpPct > 40) {
+    filterEl.style.backdropFilter = 'blur(1px) grayscale(0.3)';
+    vignetteEl.style.opacity = 0.1;
+  } else if (hpPct > 20) {
+    filterEl.style.backdropFilter = 'blur(2px) grayscale(0.6) contrast(1.2)';
+    vignetteEl.style.opacity = 0.3;
   } else {
-    // 濒死状态：模糊、色差、暗角
-    filterEl.style.backdropFilter = 'blur(3px) grayscale(0.8) contrast(1.5) hue-rotate(-10deg)';
-    vignetteEl.style.opacity = 0.8;
-    // 加入脉冲呼吸感
-    vignetteEl.style.opacity = 0.5 + Math.sin(this.world.time * 8) * 0.3;
+    // 濒死：稍微红一点，但不完全遮住视野
+    filterEl.style.backdropFilter = 'blur(3px) grayscale(0.9) contrast(1.5) hue-rotate(-10deg)';
+    vignetteEl.style.opacity = 0.4 + Math.sin(this.world.time * 8) * 0.15; 
   }
 }
 
