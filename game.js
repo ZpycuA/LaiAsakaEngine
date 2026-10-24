@@ -618,50 +618,52 @@ _updateCouplingFX(p) {
    ============================================================ */
 class GameWorld {
   constructor(engine, config){
-    this.engine = engine;
-    this.config = config;
+  this.engine = engine;
+  this.config = config;
 
-    this.mapId   = config.mapId;
-    this.charId  = config.charId;
-    this.diffId  = config.diffId;
-    this.modeId  = config.modeId;
-    this.kind    = config.kind;
+  this.mapId   = config.mapId;
+  this.charId  = config.charId;
+  this.diffId  = config.diffId;
+  this.modeId  = config.modeId;
+  this.kind    = config.kind;
 
-    this.mapSpec  = engine.content.get('maps', this.mapId);
-    this.charSpec = engine.content.get('characters', this.charId);
-    this.modeConfig = engine.modeRegistry.get(this.modeId);
+  this.mapSpec  = engine.content.get('maps', this.mapId);
+  this.charSpec = engine.content.get('characters', this.charId);
+  this.modeConfig = engine.modeRegistry.get(this.modeId);
 
-    if (!this.mapSpec)   throw new Error('[World] 地图不存在: ' + this.mapId);
-    if (!this.charSpec)  throw new Error('[World] 角色不存在: ' + this.charId);
-    if (!this.modeConfig) throw new Error('[World] 模式不存在: ' + this.modeId);
+  if (!this.mapSpec)   throw new Error('[World] 地图不存在: ' + this.mapId);
+  if (!this.charSpec)  throw new Error('[World] 角色不存在: ' + this.charId);
+  if (!this.modeConfig) throw new Error('[World] 模式不存在: ' + this.modeId);
 
-    this.physics    = engine.physicsFactory();
-    this.player     = null;
-    this.enemies    = [];
-    this.extracts   = [];
-    this.containers = [];
-    this.obstacles  = [];
-    this.tracers    = [];
+  this.physics    = engine.physicsFactory();
+  this.player     = null;
+  this.enemies    = [];
+  this.extracts   = [];
+  this.containers = [];
+  this.obstacles  = [];
+  this.tracers    = [];
+  this.pois       = []; // ★ 新增：兴趣点数组（用于小地图）
 
-    this.time       = 0;
-    this.running    = false;
-    this.paused     = false;
-    this.extractTimer = 0;
-    this.activeExtract = null;
-    this.timeLimit  = config.timeLimit || 0;
+  this.time       = 0;
+  this.running    = false;
+  this.paused     = false;
+  this.extractTimer = 0;
+  this.activeExtract = null;
+  this.timeLimit  = config.timeLimit || 0;
 
-    this.stats = { shots: 0, hits: 0, headshots: 0, kills: 0 };
+  this.stats = { shots: 0, hits: 0, headshots: 0, kills: 0 };
 
-    this.onEnd = null;
-    this._searchTarget = null;
-    this._searchTimer = 0;
-    this._searching = false;
-    this._lastProtectionUse = 0;
-    this._protectionStartTime = 0;
+  this.onEnd = null;
+  this._searchTarget = null;
+  this._searchTimer = 0;
+  this._searching = false;
+  this._lastProtectionUse = 0;
+  this._protectionStartTime = 0;
 
-    this.tasks = new TaskSystem(this);
-    this.hud = new HUDSystem(this);
-  }
+  this.tasks = new TaskSystem(this);
+  this.hud = new HUDSystem(this);
+  this.damageLog = []; // 确保之前加入的伤害日志数组也在这里初始化
+}
 
   start(){
     this._setupScene();
