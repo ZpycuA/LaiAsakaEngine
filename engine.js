@@ -641,7 +641,7 @@ class VirtualJoystick {
    [9] InputSystem
    ============================================================ */
 class InputSystem {
-  constructor(){
+    constructor(){
     this.keys = new Set();
     this.mouse = { x: 0, y: 0, left: false, right: false, middle: false, wheel: 0 };
     this.touch = { left: null, right: null };
@@ -653,7 +653,7 @@ class InputSystem {
     this.joystickRight = null;
     this.enableVirtualJoysticks = false;
     this._touchStartPositions = new Map();
-    this.virtualActions = new Map();
+    this.virtualActions = new Map(); // ★ 加了这一行，至关重要
   }
 
   registerAction(name, cfg){ this.actions.set(name, cfg || {}); return this; }
