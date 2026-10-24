@@ -1493,31 +1493,28 @@ _raycastBullet(owner, dirX, dirY, dirZ, baseEnergy, range, weaponDef, ammoDef, i
     catch (e) { console.error(`[Mode] ${hookName}:`, e); }
   }
 
- _syncMeshes(){
+_syncMeshes(){
   const p = this.player;
   if (p && p.mesh) {
     p.mesh.position.set(p.body.position.x, 0, p.body.position.z);
     p.mesh.rotation.y = -p.angle;
   }
-  
   for (const e of this.enemies) {
     if (!e.alive || !e.mesh) continue;
     e.mesh.position.set(e.body.position.x, 0, e.body.position.z);
     e.mesh.rotation.y = -e.angle;
     
-    // ★ 核心修复：确保闪光状态正确重置
     if (e.hitFlash > 0) {
       e.mesh.traverse(obj => {
-        if (obj.isMesh && obj.material) {
+        if (obj.isMesh && obj.material && obj.material.emissive) {
           obj.material.emissive.setHex(0xffffff);
           obj.material.emissiveIntensity = 0.8;
         }
       });
     } else {
       e.mesh.traverse(obj => {
-        if (obj.isMesh && obj.material) {
-          // 彻底关闭发光
-          obj.material.emissive.setHex(0x000000);
+        if (obj.isMesh && obj.material && obj.material.emissive) {
+          obj.material.emissive.setHex(0x000000); 
           obj.material.emissiveIntensity = 0;
         }
       });
