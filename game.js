@@ -797,7 +797,7 @@ class GameWorld {
   }
 }
 
-  _updatePlayer(dt){
+_updatePlayer(dt){
   const p = this.player;
   if (!p || !p.alive) return;
 
@@ -807,8 +807,8 @@ class GameWorld {
   if (e.input.joystickRight && e.input.joystickRight.visible) {
     const v = e.input.joystickRight.vector;
     if (v.magnitude > 0.1) {
-      // 配合灵敏度变量
-      e.cameraCtl.rotate(v.x * dt * 800 * e.cameraCtl.sensitivity, v.y * dt * 800 * e.cameraCtl.sensitivity);
+      // 灵敏度放大
+      e.cameraCtl.rotate(v.x * dt * 1500, v.y * dt * 1500);
     }
   }
 
@@ -831,21 +831,17 @@ class GameWorld {
   
   if (moveX !== 0 || moveZ !== 0) p.body.wake();
 
-  // ★ 修复跳跃：改用精确射线检测落地
-  const isGrounded = e.physics.isGrounded(p.body.position.x, p.body.position.y, p.body.position.z, p.body.radius);
+  // 可靠的跳跃判断（不要用物理平面射线，直接用高度和速度）
   const jumpPressed = e.input.keys.has(' ') || e.input.isActive('jump');
-  
-  if (jumpPressed && isGrounded && p.body.velocity.y <= 0.1) {
-    p.body.velocity.y = 8.5; // 调整跳跃力
+  if (jumpPressed && p.body.position.y <= p.body.radius + 0.2 && p.body.velocity.y <= 0.1) {
+    p.body.velocity.y = 10; 
     p.body.wake();
   }
 
-  // 角色永远面朝相机前方
   p.angle = e.cameraCtl.yaw;
 
   this._updateProtection(dt);
 
-  // ... 下面的冷却、开火、技能逻辑保持不变 ...
   for (const sk of p.skills) {
     if (!sk.ready) {
       sk.cd -= dt;
@@ -874,6 +870,7 @@ class GameWorld {
   p.body.position.x = Math.max(-half, Math.min(half, p.body.position.x));
   p.body.position.z = Math.max(-half, Math.min(half, p.body.position.z));
 }
+
 
   _updateProtection(dt){
     const p = this.player;
