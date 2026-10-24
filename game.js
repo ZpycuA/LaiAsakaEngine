@@ -349,6 +349,8 @@ class HUDSystem {
   this._initEls();
   this._bindProtectionButtons();
   this._applyVisibility();
+  this._renderMinimap();
+  this._renderDamageIndicator();
 
   // 数值更新
   this._setText('player-name', p.charSpec ? this.engine.i18n.t(p.charSpec.name) : '—');
@@ -426,6 +428,89 @@ _updateHurtFX(hpPct) {
   }
 }
 
+_renderMinimap(){
+  const canvas = document.getElementById('minimap');
+  if (!canvas) return;
+  const mapContainer = document.getElementById('minimap-container');
+  if (mapContainer) mapContainer.style.display = 'block';
+
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  
+  // 黑色底
+  ctx.fillStyle = 'rgba(8,14,22,0.9)';
+  ctx.fillRect(0, 0, w, h);
+
+  const p = this.world.player;
+  if (!p) return;
+
+  const mapSize = this.world.mapSpec.size;
+  const scale = w / mapSize;
+  const cx = w/2, cy = h/2;
+  const px = p.body.position.x, pz = p.body.position.z;
+
+  // 绘制玩家（中心点）
+  ctx.fillStyle = '#7fe0ff';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 玩家朝向线
+  ctx.strokeStyle = 'rgba(120,225,255,0.8)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.sin(this.engine.cameraCtl.yaw) * 12, cy - Math.cos(this.engine.cameraCtl.yaw) * 12);
+  ctx.stroke();
+
+  // 绘制敌人
+  ctx.fillStyle = '#ff5a5a';
+  for (const e of this.world.enemies) {
+    if (!e.alive) continue;
+    const ex = cx + (e.body.position.x - px) * scale;
+    const ey = cy + (e.body.position.z - pz) * scale;
+    if (ex >= 0 && ex <= w && ey >= 0 && ey <= h) {
+      ctx.beginPath();
+      ctx.arc(ex, ey, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+_renderDamageIndicator(){
+  const canvas = document.getElementById('dmg-indicator');
+  if (!canvas) return;
+  if (canvas.width !== window.innerWidth) {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const w = this.world;
+  if (!w || !w.lastHitDir || w.time - (w.lastHitTime || 0) > 1.5) return;
+
+  // 绘制受击弧线（相对于玩家当前的 yaw）
+  const relAngle = w.lastHitDir; 
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const radius = 120;
+  const alpha = Math.max(0, 1 - (w.time - w.lastHitTime) / 1.5);
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(relAngle);
+  
+  // 画一道红色弧线
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, -Math.PI/2 - 0.4, -Math.PI/2 + 0.4);
+  ctx.strokeStyle = `rgba(255, 50, 50, ${alpha})`;
+  ctx.lineWidth = 8;
+  ctx.stroke();
+  
+  ctx.restore();
+}
 // 耦合屏幕边缘光效
 _updateCouplingFX(p) {
   const el = document.getElementById('fx-coupling');
