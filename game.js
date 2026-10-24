@@ -788,23 +788,32 @@ class GameWorld {
     }
   }
 
-  _updatePlayer(dt){
+    _updatePlayer(dt){
     const p = this.player;
     if (!p || !p.alive) return;
 
-    const aim = this.engine.input.getAimVector(
-      p.body.position.x, p.body.position.z, this.engine.renderer.camera
-    );
-    if (Math.abs(aim.x) > 0.01 || Math.abs(aim.z) > 0.01) {
-      p.angle = Math.atan2(aim.z, aim.x);
-    }
-
-    // ★ [Profile] 四肢伤害会影响移速
     const mv = this.engine.input.getMoveVector();
     const baseSpeed = p.charSpec.speed;
     const speedMul = p.speedMul !== undefined ? p.speedMul : 1;
-    p.body.velocity.x = mv.x * baseSpeed * speedMul;
-    p.body.velocity.z = mv.z * baseSpeed * speedMul;
+
+    const camForward = new THREE.Vector3();
+    this.engine.renderer.camera.getWorldDirection(camForward);
+    camForward.y = 0;
+    camForward.normalize();
+    const camRight = new THREE.Vector3().crossVectors(camForward, new THREE.Vector3(0, 1, 0)).normalize();
+
+    let moveX = camRight.x * mv.x + camForward.x * -mv.z;
+    let moveZ = camRight.z * mv.x + camForward.z * -mv.z;
+
+    p.body.velocity.x = moveX * baseSpeed * speedMul;
+    p.body.velocity.z = moveZ * baseSpeed * speedMul;
+
+    const aim = this.engine.input.getAimVector(p.body.position.x, p.body.position.z, this.engine.renderer.camera);
+    if (Math.abs(aim.x) > 0.01 || Math.abs(aim.z) > 0.01) {
+      p.angle = Math.atan2(aim.z, aim.x);
+    } else if (moveX !== 0 || moveZ !== 0) {
+      p.angle = Math.atan2(moveZ, moveX);
+    }
 
     this._updateProtection(dt);
 
