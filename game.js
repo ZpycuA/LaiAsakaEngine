@@ -1763,48 +1763,50 @@ export class GameApp {
     });
   }
 
-      startMatch(kind){
-    const e = this.engine;
-    this._lastMatchKind = kind;
+    startMatch(kind){
+  const e = this.engine;
+  this._lastMatchKind = kind;
 
-    // 强制清理所有遮罩，加上了 ? 防止 DOM 缺失报错
-    document.getElementById('result-screen')?.classList.remove('on');
-    document.getElementById('pause-screen')?.classList.remove('on');
-    document.getElementById('game-screen')?.classList.add('on');
-    
-    const crosshair = document.getElementById('crosshair');
-    if (crosshair) crosshair.style.display = 'block';
+  // ★ 核心修复 1：真正切换屏幕（把菜单关掉，把游戏打开）
+  this._showScreen('game');
+  
+  // 保险起见，直接把所有悬浮层清理掉
+  document.getElementById('result-screen')?.classList.remove('on');
+  document.getElementById('pause-screen')?.classList.remove('on');
+  
+  const crosshair = document.getElementById('crosshair');
+  if (crosshair) crosshair.style.display = 'block';
 
-    let isMobile = this.platform === 'mobile';
-    if (this.platform === 'auto') isMobile = 'ontouchstart' in window;
-    
-    e.input.enableVirtualJoysticks = isMobile;
-    this._setupMobileControls(isMobile);
-    this._bindCameraControls();
+  let isMobile = this.platform === 'mobile';
+  if (this.platform === 'auto') isMobile = 'ontouchstart' in window;
+  
+  e.input.enableVirtualJoysticks = isMobile;
+  this._setupMobileControls(isMobile);
+  this._bindCameraControls();
 
-    if (this.world) {
-      try { this.world.destroy(); } catch (err) { console.warn(err); }
-      this.world = null;
-    }
-
-    try {
-      this.world = new GameWorld(e, {
-        mapId: this.menuState.map,
-        charId: this.menuState.char,
-        diffId: this.menuState.diff,
-        modeId: this.menuState.mode,
-        kind,
-      });
-
-      this.world.onEnd = (success, stats) => this._onMatchEnd(success, stats);
-      this.world.start();
-      e.bus.emit('matchStarted', { kind });
-    } catch (err) {
-      console.error('[GameApp] startMatch failed:', err);
-      alert('启动失败，请查看控制台：' + (err && err.message ? err.message : String(err)));
-      this._showScreen('menu');
-    }
+  if (this.world) {
+    try { this.world.destroy(); } catch (err) { console.warn(err); }
+    this.world = null;
   }
+
+  try {
+    this.world = new GameWorld(e, {
+      mapId: this.menuState.map,
+      charId: this.menuState.char,
+      diffId: this.menuState.diff,
+      modeId: this.menuState.mode,
+      kind,
+    });
+
+    this.world.onEnd = (success, stats) => this._onMatchEnd(success, stats);
+    this.world.start();
+    e.bus.emit('matchStarted', { kind });
+  } catch (err) {
+    console.error('[GameApp] startMatch failed:', err);
+    alert('启动失败，请查看控制台：' + (err && err.message ? err.message : String(err)));
+    this._showScreen('menu');
+  }
+}
 
       _onMatchEnd(success, stats){
     try {
