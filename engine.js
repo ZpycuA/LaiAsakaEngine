@@ -2359,6 +2359,7 @@ class Engine {
     this.save         = new SaveSystem('LaiAsaka_Save_v3');
     this.meshes       = new MeshFactory();
     this.modeRegistry = new ModeRegistry();
+    this.profile      = new ProfileSystem(this);
     this.devConsole   = new DevConsole(this);
     this.loader       = new Loader(this);
     this.audio        = new AudioSystem(this);
@@ -2564,5 +2565,6 @@ export {
   Loader,
   DevConsole,
   ModeRegistry,
+  ProfileSystem,
   Utils,
 };
