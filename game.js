@@ -706,54 +706,57 @@ class GameWorld {
   }
 
   _setupScene(){
-    const r = this.engine.renderer;
-    r.clearScene();
+  const r = this.engine.renderer;
+  r.clearScene();
 
-    const mapSize = this.mapSpec.size;
-    const half = mapSize / 2;
+  const mapSize = this.mapSpec.size;
+  const half = mapSize / 2;
 
-    const groundGeo = new THREE.PlaneGeometry(mapSize, mapSize);
-    const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x1a2536, roughness: 0.95, metalness: 0.05,
+  const groundGeo = new THREE.PlaneGeometry(mapSize, mapSize);
+  const groundMat = new THREE.MeshStandardMaterial({
+    color: 0x1a2536, roughness: 0.95, metalness: 0.05,
+  });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  r.scene.add(ground);
+
+  const grid = new THREE.GridHelper(mapSize, Math.floor(mapSize / 6), 0x3a5470, 0x243448);
+  grid.material.opacity = 0.35;
+  grid.material.transparent = true;
+  r.scene.add(grid);
+
+  const obstacleCount = this.mapSpec.obstacleCount || 30;
+  for (let i = 0; i < obstacleCount; i++) {
+    const w = 3 + Math.random() * 6;
+    const d = 3 + Math.random() * 6;
+    const h = 2 + Math.random() * 2.5;
+    const x = (Math.random() * 2 - 1) * (half - 6);
+    const z = (Math.random() * 2 - 1) * (half - 6);
+    if (Math.hypot(x, z) < 6) continue;
+
+    const mesh = this.engine.meshes.build('obstacle', {
+      w, h, d,
+      color: Math.random() < 0.5 ? 0x22314a : 0x28394f,
     });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    r.scene.add(ground);
+    mesh.position.x = x;
+    mesh.position.z = z;
+    r.scene.add(mesh);
 
-    const grid = new THREE.GridHelper(mapSize, Math.floor(mapSize / 6), 0x3a5470, 0x243448);
-    grid.material.opacity = 0.35;
-    grid.material.transparent = true;
-    r.scene.add(grid);
-
-    const obstacleCount = this.mapSpec.obstacleCount || 30;
-    for (let i = 0; i < obstacleCount; i++) {
-      const w = 3 + Math.random() * 6;
-      const d = 3 + Math.random() * 6;
-      const h = 2 + Math.random() * 2.5;
-      const x = (Math.random() * 2 - 1) * (half - 6);
-      const z = (Math.random() * 2 - 1) * (half - 6);
-      if (Math.hypot(x, z) < 6) continue;
-
-      const mesh = this.engine.meshes.build('obstacle', {
-        w, h, d,
-        color: Math.random() < 0.5 ? 0x22314a : 0x28394f,
-      });
-      mesh.position.x = x;
-      mesh.position.z = z;
-      r.scene.add(mesh);
-
-      const body = this.physics.add(new Body({
-        x, z,
-        isStatic: true,
-        shape: 'aabb',
-        halfW: w / 2,
-        halfD: d / 2,
-        radius: 0,
-        userData: { type: 'obstacle' },
-      }));
-      this.obstacles.push({ mesh, body });
-    }
+    const body = this.physics.add(new Body({
+      x, z,
+      isStatic: true,
+      shape: 'aabb',
+      halfW: w / 2,
+      halfD: d / 2,
+      radius: 0,
+      userData: { type: 'obstacle' },
+    }));
+    this.obstacles.push({ mesh, body });
+    
+    // ★ 将障碍物加入小地图兴趣点
+    this.pois.push({ x, z, type: 'obstacle', w, h: d, color: 'rgba(90,130,175,0.5)' });
   }
+}
 
   _spawnPlayer(){
   const spec = this.charSpec;
