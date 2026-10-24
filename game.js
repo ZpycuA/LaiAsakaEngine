@@ -1637,18 +1637,17 @@ _addKillFeed(name, dmg, dist) {
     sk.cd = sk.def.cd * cdMul;
     sk.ready = false;
 
-    this._applySkillEffect(p, sk.def);
-    this._log('【' + this.engine.i18n.t(sk.def.name) + '】已触发', 'p');
-    this._playSFX('skill');
-  }
+      this._applySkillEffect(p, sk.def);
+  this._log('【' + this.engine.i18n.t(sk.def.name) + '】已触发', 'p');
+  this.combatLog.push({
+    type: 'skill_use', t: this.time,
+    name: this.engine.i18n.t(sk.def.name),
+    detail: '',
+  });
+  this._playSFX('skill');
+}
 
-   this.combatLog.push({
-  type: 'skill_use', t: this.time,
-  name: this.engine.i18n.t(sk.def.name),
-  detail: '',
-});
-   
-  _applySkillEffect(p, def){
+_applySkillEffect(p, def){
     switch (def.kind) {
       case 'dash': {
         const angle = p.angle;
