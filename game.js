@@ -1767,19 +1767,19 @@ export class GameApp {
     const e = this.engine;
     this._lastMatchKind = kind;
 
-    // 强制清理所有遮罩
-    document.getElementById('result-screen').classList.remove('on');
-    document.getElementById('pause-screen').classList.remove('on');
-    document.getElementById('game-screen').classList.add('on');
-    document.getElementById('crosshair').style.display = 'block';
+    // 强制清理所有遮罩，加上了 ? 防止 DOM 缺失报错
+    document.getElementById('result-screen')?.classList.remove('on');
+    document.getElementById('pause-screen')?.classList.remove('on');
+    document.getElementById('game-screen')?.classList.add('on');
+    
+    const crosshair = document.getElementById('crosshair');
+    if (crosshair) crosshair.style.display = 'block';
 
-    // 平台识别与移动端按键生成
     let isMobile = this.platform === 'mobile';
     if (this.platform === 'auto') isMobile = 'ontouchstart' in window;
     
     e.input.enableVirtualJoysticks = isMobile;
     this._setupMobileControls(isMobile);
-
     this._bindCameraControls();
 
     if (this.world) {
@@ -1801,7 +1801,7 @@ export class GameApp {
       e.bus.emit('matchStarted', { kind });
     } catch (err) {
       console.error('[GameApp] startMatch failed:', err);
-      alert('启动失败：' + (err && err.message ? err.message : String(err)));
+      alert('启动失败，请查看控制台：' + (err && err.message ? err.message : String(err)));
       this._showScreen('menu');
     }
   }
