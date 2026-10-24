@@ -934,19 +934,22 @@ class GameWorld {
 }
 
   _spawnExtracts(){
-    const half = this.mapSpec.size / 2 - 4;
-    const positions = [
-      { x: -half, z: -half }, { x: half, z: -half },
-      { x: -half, z: half },  { x: half, z: half },
-    ];
-    for (const pos of positions) {
-      const mesh = this.engine.meshes.build('extract', { radius: 3.5 });
-      mesh.position.x = pos.x;
-      mesh.position.z = pos.z;
-      this.engine.renderer.scene.add(mesh);
-      this.extracts.push({ x: pos.x, z: pos.z, mesh, timer: 0, active: false });
-    }
+  const half = this.mapSpec.size / 2 - 4;
+  const positions = [
+    { x: -half, z: -half }, { x: half, z: -half },
+    { x: -half, z: half },  { x: half, z: half },
+  ];
+  for (const pos of positions) {
+    const mesh = this.engine.meshes.build('extract', { radius: 3.5 });
+    mesh.position.x = pos.x;
+    mesh.position.z = pos.z;
+    this.engine.renderer.scene.add(mesh);
+    this.extracts.push({ x: pos.x, z: pos.z, mesh, timer: 0, active: false });
+    
+    // ★ 将撤离点加入小地图兴趣点
+    this.pois.push({ x: pos.x, z: pos.z, type: 'extract', color: '#5fd4ff' });
   }
+}
 
   _spawnContainers(){
     const half = this.mapSpec.size / 2 - 6;
