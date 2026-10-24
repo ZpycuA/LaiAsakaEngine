@@ -2294,6 +2294,7 @@ if (gyroSens) {
     const save = e.save;
     const assessment = e.profile.assess();
 
+    /* ---- 存档 ---- */
     save.data.stats = save.data.stats || { runs: 0, extracts: 0, deaths: 0, kills: 0 };
     save.data.stats.runs++;
     if (success) save.data.stats.extracts++;
@@ -2305,21 +2306,138 @@ if (gyroSens) {
     baseReward += (stats.kills || 0) * 30;
     baseReward += (stats.carriedValue || 0);
     const finalReward = Math.round(baseReward * assessment.rewardMul);
-
     save.data.credits = (save.data.credits || 0) + finalReward;
     save.save();
 
+    /* ---- 结束日志 ---- */
+    const world = this.world;
+    if (world && world.combatLog) world.combatLog.end(world.time);
+    const summary = world && world.combatLog ? world.combatLog.summary() : null;
+    const isStraight = world && world.modeId === 'straight';
+    const isTraining = world && world.kind === 'training';
+
+    /* ---- 清理旧界面 ---- */
+    document.getElementById('result-screen')?.classList.remove('on');
+    document.getElementById('pause-screen')?.classList.remove('on');
+    const mob = document.getElementById('mobile-controls');
+    if (mob) mob.style.display = 'none';
+
+    /* ---- 分支：straight 死亡 / 失败 → 战斗记录（无再来一次） ---- */
+    if (isStraight && !success && !isTraining) {
+      const distanceSub = `存活 ${Math.round(stats.time || 0)}s · 击杀 ${stats.kills || 0} · 造成 ${Math.round(stats.dealt || 0)} 伤害`;
+      showCombatReport({
+        title: '作 战 记 录',
+        titleClass: 'fail',
+        sub: distanceSub,
+        summary,
+        log: world.combatLog,
+        buttons: [
+          {
+            label: '查看仓库 / 配装',
+            primary: true,
+            onClick: () => {
+              hideCombatReport();
+              this._quitToMenu();
+              /* TODO: 仓库系统完成后，改成 engine.app.openStash() */
+            },
+          },
+          {
+            label: '返回菜单',
+            onClick: () => {
+              hideCombatReport();
+              this._quitToMenu();
+            },
+          },
+        ],
+      });
+      e.bus.emit('matchEnded', { success, stats, reward: finalReward, assessment });
+      return;
+    }
+
+    /* ---- 分支：straight 成功 → 战利品总结（无再来一次） ---- */
+    if (isStraight && success && !isTraining) {
+      const title = document.getElementById('result-title');
+      const statsEl = document.getElementById('result-stats');
+      if (title) {
+        title.textContent = '撤 离 成 功';
+        title.className = 'success';
+      }
+      if (statsEl) {
+        statsEl.innerHTML = [
+          `击杀：<b>${stats.kills || 0}</b>　命中率：<b>${stats.accuracy || 0}%</b>`,
+          `造成伤害：<b>${Math.round(stats.dealt || 0)}</b>　承受伤害：<b>${Math.round(stats.taken || 0)}</b>`,
+          `存活：<b>${stats.time || 0}s</b>　携带物资：<b>${stats.carriedValue || 0} cp</b>`,
+          `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(120,180,240,.2);color:var(--dim)">
+            难度：<b>${e.i18n.t(assessment.label)}</b> (${Math.round(assessment.score * 100)}/100)　奖励倍率：<b>×${assessment.rewardMul}</b>
+          </div>`,
+          `<div style="padding-top:8px;border-top:1px solid rgba(120,180,240,.2)">
+            本局奖励：<b style="color:var(--gold)">+${finalReward} cp</b>
+          </div>`,
+        ].join('<br>');
+      }
+      /* 隐藏"再来一次"，改成"查看战斗记录 + 返回菜单" */
+      const againBtn = document.getElementById('btn-again');
+      if (againBtn) againBtn.style.display = 'none';
+      const menuBtn = document.getElementById('btn-menu');
+      if (menuBtn) {
+        menuBtn.textContent = '返回菜单';
+        menuBtn.onclick = () => {
+          document.getElementById('result-screen')?.classList.remove('on');
+          this._quitToMenu();
+        };
+      }
+      /* 加一个"查看战斗记录"按钮（一次性） */
+      let reportBtn = document.getElementById('btn-view-report');
+      if (!reportBtn && statsEl && statsEl.parentNode) {
+        reportBtn = document.createElement('button');
+        reportBtn.id = 'btn-view-report';
+        reportBtn.textContent = '查看战斗记录';
+        reportBtn.style.cssText = 'margin-top:10px;padding:10px 22px;border-radius:8px;background:rgba(40,80,130,.7);border:1px solid rgba(110,180,255,.5);color:#cfe8ff;font-size:13px;cursor:pointer;';
+        statsEl.parentNode.appendChild(reportBtn);
+      }
+      if (reportBtn) {
+        reportBtn.onclick = () => {
+          showCombatReport({
+            title: '战 斗 记 录',
+            titleClass: 'success',
+            sub: `存活 ${Math.round(stats.time || 0)}s · 击杀 ${stats.kills || 0}`,
+            summary,
+            log: world.combatLog,
+            buttons: [
+              { label: '关闭', onClick: () => hideCombatReport() },
+            ],
+          });
+        };
+      }
+      document.getElementById('result-screen')?.classList.add('on');
+      e.bus.emit('matchEnded', { success, stats, reward: finalReward, assessment });
+      return;
+    }
+
+    /* ---- 其他分支（训练场 / 未来 asaka）→ 保持原样 ---- */
     const title = document.getElementById('result-title');
     const statsEl = document.getElementById('result-stats');
     if (title) {
       title.textContent = e.i18n.t(success ? 'ui.result.extract_success' : 'ui.result.operation_failed');
       title.className = success ? 'success' : 'fail';
     }
+    const againBtn = document.getElementById('btn-again');
+    if (againBtn) againBtn.style.display = '';
+    const menuBtn = document.getElementById('btn-menu');
+    if (menuBtn) {
+      menuBtn.textContent = '返回菜单';
+      menuBtn.onclick = () => {
+        document.getElementById('result-screen')?.classList.remove('on');
+        this._quitToMenu();
+      };
+    }
+    const reportBtn2 = document.getElementById('btn-view-report');
+    if (reportBtn2) reportBtn2.remove();
 
     if (statsEl) {
-      const statLines = [
+      statsEl.innerHTML = [
         `击杀：<b>${stats.kills || 0}</b>　命中率：<b>${stats.accuracy || 0}%</b>`,
-        `造成伤害：<b>${stats.dealt || 0}</b>　承受伤害：<b>${stats.taken || 0}</b>`,
+        `造成伤害：<b>${Math.round(stats.dealt || 0)}</b>　承受伤害：<b>${Math.round(stats.taken || 0)}</b>`,
         `存活：<b>${stats.time || 0}s</b>　携带物资：<b>${stats.carriedValue || 0} cp</b>`,
         `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(120,180,240,.2);color:var(--dim)">
           难度：<b>${e.i18n.t(assessment.label)}</b> (${Math.round(assessment.score * 100)}/100)　奖励倍率：<b>×${assessment.rewardMul}</b>
@@ -2327,21 +2445,12 @@ if (gyroSens) {
         `<div style="padding-top:8px;border-top:1px solid rgba(120,180,240,.2)">
           本局奖励：<b style="color:var(--gold)">+${finalReward} cp</b>
         </div>`,
-      ];
-      statsEl.innerHTML = statLines.join('<br>');
+      ].join('<br>');
     }
-
     document.getElementById('result-screen')?.classList.add('on');
-    document.getElementById('pause-screen')?.classList.remove('on');
-    
-    // ★ 核心修复 2：空指针保护
-    const mob = document.getElementById('mobile-controls');
-    if (mob) mob.style.display = 'none';
-
     e.bus.emit('matchEnded', { success, stats, reward: finalReward, assessment });
   } catch (err) {
     console.error('[GameApp] 结算出错:', err);
-    document.getElementById('result-screen')?.classList.add('on');
   }
 }
 
