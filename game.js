@@ -11,6 +11,8 @@
 import * as THREE from 'three';
 import { Body } from './engine.js';
 import { CombatLog, showCombatReport, hideCombatReport } from './combatlog.js';
+import { Inventory } from './inventory.js';
+import { BagUI } from './bagUI.js';
 
 /* ============================================================
    [0] 战斗公式常数
