@@ -25,20 +25,24 @@ export function registerDefaultContent(engine) {
   const c = engine.content;
 
   /* ==========================================================
-     1. 弹药
-     ----------------------------------------------------------
-     massG: 弹头质量（克）
-     v0:    枪口初速（米/秒）
-     tier:  稀有度（0~5，0 普通，5 极稀有）
-     动能由 E = ½mv² 现场计算，不在数据里硬编码。
-     ========================================================== */
-  const AMMO = {
-    '9mm':    { name: 'content.ammo.9mm.name',    massG: 8.0,  v0: 360, tier: 0 },
-    '5.56':   { name: 'content.ammo.556.name',    massG: 4.0,  v0: 940, tier: 2 },
-    '7.62':   { name: 'content.ammo.762.name',    massG: 8.0,  v0: 730, tier: 2 },
-    '.45acp': { name: 'content.ammo.45acp.name',  massG: 14.9, v0: 290, tier: 0 },
-    '12ga':   { name: 'content.ammo.12ga.name',   massG: 3.5,  v0: 410, tier: 0 },
-  };
+/* ==========================================================
+   1. 弹药
+   ----------------------------------------------------------
+   massG: 弹头质量（克）
+   v0:    枪口初速（米/秒）
+   tier:  稀有度（0~5），仅用于掉落/展示，与穿透力无关
+   pen:   穿透力（0~9），供 CombatSystem.applyArmor 消费
+          与护甲 lv 对比：pen-lv>=3 → 几乎无视，>=1 → 削弱减伤，
+          =0 → 正常，<=-2 → 减伤增强
+   ⚠ 这两者独立：tier 高不代表穿透高，反之亦然
+   ========================================================== */
+const AMMO = {
+  '9mm':    { name: 'content.ammo.9mm.name',    massG: 8.0,  v0: 360, tier: 0, pen: 0 },
+  '5.56':   { name: 'content.ammo.556.name',    massG: 4.0,  v0: 940, tier: 2, pen: 3 },
+  '7.62':   { name: 'content.ammo.762.name',    massG: 8.0,  v0: 730, tier: 2, pen: 5 },
+  '.45acp': { name: 'content.ammo.45acp.name',  massG: 14.9, v0: 290, tier: 0, pen: 1 },
+  '12ga':   { name: 'content.ammo.12ga.name',   massG: 3.5,  v0: 410, tier: 0, pen: 0 },
+};
   c.registerAll('ammo', AMMO);
 
   /* ==========================================================
