@@ -2360,20 +2360,8 @@ if (gyroSens) {
     });
   }
        // 初始化库存
-    this.inventory = new Inventory(this.engine.content);
-    if (this.engine.save.data && this.engine.save.data.inventory) {
-      try { this.inventory.deserialize(this.engine.save.data.inventory); }
-      catch (e) { console.warn('[Bag] 库存反序列化失败，重置', e); }
-    }
-    // 空库存给一把新手枪
-    if (this.inventory.items.size === 0) {
-      const w = this.inventory.createItem('weapons', 'p9');
-      if (w) this.inventory.equip('main', w);
-      const a = this.inventory.createItem('ammo', '9mm', { qty: 60 });
-      if (a) this.inventory.addToContainer('stash', a);
-    }
-    this.bagUI = new BagUI(this.engine, this.inventory);
-
+ 
+   
     startMatch(kind){
   const e = this.engine;
   this._lastMatchKind = kind;
