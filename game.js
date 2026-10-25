@@ -2212,18 +2212,17 @@ export class GameApp {
   });
 
   window.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape' && this.world && this.world.running) {
-      ev.preventDefault();
-      this._togglePause();
-    }
-  });
+  if (ev.key === 'Escape' && this.world && this.world.running) {
+    ev.preventDefault();
+    this._togglePause();
+  }
+  if (ev.key.toLowerCase() === 'b' && this.world && this.world.running && this.bagUI) {
+    ev.preventDefault();
+    this.bagUI.toggle();
+  }
+});
 
-      if (ev.key.toLowerCase() === 'b' && this.world && this.world.running && this.bagUI) {
-      ev.preventDefault();
-      this.bagUI.toggle();
-      }
-
-  e.i18n.onLanguageChange(() => {
+e.i18n.onLanguageChange(() => {
     if (this._menuReady) {
       this._setupMenu();
       if (this.world) this.world.hud.update();
