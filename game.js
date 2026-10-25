@@ -1285,32 +1285,41 @@ _raycastBullet(owner, ox, oy, oz, dirX, dirY, dirZ, baseEnergy, range, weaponDef
 
   const lenXZ = Math.hypot(dirX, dirZ) || 1;
   const hit = this.physics.raycast(ox, oy, oz, dirX/lenXZ, dirY, dirZ/lenXZ, range, hitFilter);
-  
+
   const dist2D = hit ? hit.t : range;
   const actualDist = dist2D / (lenXZ || 1);
   const endX = ox + dirX * actualDist;
   const endY = oy + dirY * actualDist;
   const endZ = oz + dirZ * actualDist;
-  
+
   this._spawnTracer(ox, oy, oz, endX, endY, endZ, isPlayer ? 0xffe08a : 0xff8b7b);
 
   const realisticDrop = this.engine.profile.get('combat.bulletDrop', false);
   const decayK = realisticDrop ? COMBAT.RANGE_DECAY_REALISTIC : COMBAT.RANGE_DECAY;
   const energy = CombatSystem.energyAtRange(baseEnergy, actualDist, range, decayK);
-  const pen = ammoDef.tier || 0;
 
-  // ★ 核心修复：优先判定是否打中敌人或玩家，避免因为子弹下坠高度变负而穿模
+  /* ★ 修复 A：pen 用 ammoDef.pen（独立字段），不再错用 tier（稀有度） */
+  const pen = (ammoDef && typeof ammoDef.pen === 'number') ? ammoDef.pen : 0;
+
   if (hit && hit.body.userData.type !== 'obstacle') {
     const targetBody = hit.body;
-    // 假设敌人身体高度范围是 (position.y, position.y + 2.2)
-    // 如果命中点高度大于敌人胸口高度（position.y + 1.2），则算爆头
-    const isHeadshot = endY > (targetBody.position.y + 1.2) && endY < (targetBody.position.y + 2.5);
+
+    /* ★ 修复 B：爆头判定改为相对目标半径的固定区间，
+         不再依赖 (position.y + 1.2) 这种会撞浮点边界的硬阈值。
+         下界 = 中心 + 半径×1.4（约"眼睛以上"），
+         上界 = 中心 + 半径×2.2（约"头顶以上"）。
+         效果：平视不爆头，需抬高准星才爆头；不同体型分别适应。 */
+    const tR = targetBody.radius || 1.2;
+    const tY = targetBody.position.y;
+    const headLow  = tY + tR * 1.4;
+    const headHigh = tY + tR * 2.2;
+    const isHeadshot = endY > headLow && endY < headHigh;
 
     if (isPlayer && hit.body.userData.type === 'enemy') {
-  this._damageEnemy(hit.body.userData.ref, energy, pen, isHeadshot);
-} else if (!isPlayer && hit.body.userData.type === 'player') {
-  this._damagePlayer(hit.body.userData.ref, energy, pen, isHeadshot, ox, oz, owner);
-}
+      this._damageEnemy(hit.body.userData.ref, energy, pen, isHeadshot);
+    } else if (!isPlayer && hit.body.userData.type === 'player') {
+      this._damagePlayer(hit.body.userData.ref, energy, pen, isHeadshot, ox, oz, owner);
+    }
     return;
   }
 
