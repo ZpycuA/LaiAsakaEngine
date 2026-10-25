@@ -586,6 +586,44 @@ _updateCouplingFX(p) {
     if (el) el.style.display = show ? '' : 'none';
   }
 
+   _renderArmor() {
+  const p = this.world.player;
+  if (!p || !p.armor) return;
+  const slots = ['shell', 'visor', 'fiber', 'plate'];
+  const cells = document.querySelectorAll('#armor-row .armor-cell');
+  for (let i = 0; i < cells.length && i < slots.length; i++) {
+    const cell = cells[i];
+    const a = p.armor[slots[i]];
+    const bar = cell.querySelector('.armor-bar > i');
+    const lv  = cell.querySelector('.armor-lv');
+
+    if (!a || !a.lv) {
+      cell.classList.add('empty');
+      cell.classList.remove('broken');
+      if (bar) bar.style.width = '0%';
+      if (lv) lv.textContent = '—';
+      continue;
+    }
+
+    cell.classList.remove('empty');
+    const max = a.max || 100;
+    const pct = Math.max(0, Math.min(100, (a.dur / max) * 100));
+    const broken = pct <= 0;
+    cell.classList.toggle('broken', broken);
+
+    if (bar) {
+      bar.style.width = pct + '%';
+      let color;
+      if (broken)            color = 'linear-gradient(90deg,#8a2020,#c04040)';
+      else if (pct > 60)     color = 'linear-gradient(90deg,#6fe07a,#a8e05a)';
+      else if (pct > 30)     color = 'linear-gradient(90deg,#ffd93d,#ffe880)';
+      else                   color = 'linear-gradient(90deg,#ff6b4a,#ff9a6a)';
+      bar.style.background = color;
+    }
+    if (lv) lv.textContent = broken ? '断' : ('Lv' + a.lv);
+  }
+}
+
   _renderExtractProgress(){
     const el = document.getElementById('extract-progress');
     const fill = document.getElementById('extract-fill');
