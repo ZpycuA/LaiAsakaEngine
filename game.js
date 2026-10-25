@@ -418,7 +418,8 @@ if (this._protectBtns) {
     else btn.classList.add('dead');
   }
 }
-  // 撤离进度
+  this._renderArmor();
+    // 撤离进度
   this._renderExtractProgress();
 }
 
