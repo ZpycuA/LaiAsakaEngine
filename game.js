@@ -2076,6 +2076,8 @@ export class GameApp {
     this._lastMatchKind = 'normal';
     this._menuReady = false;
     this.platform = 'auto'; 
+    this.inventory = null;
+    this.bagUI = null;
   }
 
   boot(){
