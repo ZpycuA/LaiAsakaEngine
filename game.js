@@ -1412,15 +1412,20 @@ _damageEnemy(enemy, energy, pen, isHead = false){
   /* 4. 头部倍率 */
   if (isHead) remaining *= COMBAT.HEAD_MULT;
 
-  /* 5. 爆头即死（profile 开关） */
-  if (isHead && profile.get('combat.headshotInstantKill', false)) {
-    remaining = player.hp * COMBAT.BODY_COEFF_HUMAN;
+  /* 5. 爆头即死（profile 开关）—— 必须用对应体质系数，
+      否则 Prazer(48) 用人类系数(34) 得到 dmg = hp×0.708，永远差一口气不死 */
+if (isHead && profile.get('combat.headshotInstantKill', false)) {
+  if (player.hp > 0) {
+    remaining = player.hp * (player.charSpec.prazer ? COMBAT.BODY_COEFF_PRAZER : COMBAT.BODY_COEFF_HUMAN);
+  } else {
+    remaining = 0;
   }
+}
 
-  /* 6. 折算 HP 伤害 */
-  const dmg = CombatSystem.energyToHP(remaining, player.charSpec.prazer);
-  player.hp -= dmg;
-  player.taken += dmg;
+/* 6. 折算 HP 伤害 */
+const dmg = CombatSystem.energyToHP(remaining, player.charSpec.prazer);
+player.hp -= dmg;
+player.taken += dmg;
 
   /* 7. 四肢伤害（profile 开关） */
   if (profile.get('combat.limbDamage', false)) {
