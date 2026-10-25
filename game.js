@@ -2204,6 +2204,11 @@ export class GameApp {
     }
   });
 
+      if (ev.key.toLowerCase() === 'b' && this.world && this.world.running && this.bagUI) {
+      ev.preventDefault();
+      this.bagUI.toggle();
+      }
+
   e.i18n.onLanguageChange(() => {
     if (this._menuReady) {
       this._setupMenu();
