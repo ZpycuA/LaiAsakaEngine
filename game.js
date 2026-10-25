@@ -1385,13 +1385,13 @@ _damageEnemy(enemy, energy, pen, isHead = false){
   }
 }
 
- _damagePlayer(player, energy, pen, isHead = false, srcX, srcZ, sourceEnt = null){
+_damagePlayer(player, energy, pen, isHead = false, srcX, srcZ, sourceEnt = null){
   if (!player.alive) return;
 
   const profile = this.engine.profile;
   const hpBefore = player.hp;
 
-  /* 1. 耦合防护 */
+  /* ===== 1. 耦合防护（Prazer 专属） ===== */
   const coup = CombatSystem.applyCoupling(player, energy, 'ballistic');
   if (coup.cost > 0) player.coupling = Math.max(0, player.coupling - coup.cost);
   const couplingSnapshot = (coup.absorbed > 0) ? {
@@ -1401,42 +1401,100 @@ _damageEnemy(enemy, energy, pen, isHead = false){
   } : null;
   let remaining = coup.remaining;
 
-  /* 2. 记录受击方向（修复 ox/oz bug） */
+  /* ===== 2. 记录受击方向 ===== */
   if (srcX !== undefined && srcZ !== undefined) {
     const ang = Math.atan2(srcZ - player.body.position.z, srcX - player.body.position.x);
     this.lastHitDir = ang - this.engine.cameraCtl.yaw;
     this.lastHitTime = this.time;
   }
 
-  /* 3. 护甲层吸收：先插板，后纤维 */
-  const plateBefore = { lv: player.armor.plate.lv, dur: player.armor.plate.dur };
-  const plateRes = CombatSystem.applyArmor(player.armor.plate, remaining, pen);
-  const plateAfter = { dur: player.armor.plate.dur, broke: player.armor.plate.dur <= 0 };
-  remaining = plateRes.remaining;
-  const fiberBefore = { lv: player.armor.fiber.lv, dur: player.armor.fiber.dur };
-  const fiberRes = CombatSystem.applyArmor(player.armor.fiber, remaining, pen);
-  const fiberAfter = { dur: player.armor.fiber.dur, broke: player.armor.fiber.dur <= 0 };
-  remaining = fiberRes.remaining;
+  /* ===== 3. 护甲层吸收（按命中部位分层） ===== */
+  let armorSnapshot = null;
 
-  /* 4. 头部倍率 */
-  if (isHead) remaining *= COMBAT.HEAD_MULT;
+  if (isHead) {
+    /* ---- 头部：shell（头盔壳）→ visor（面罩） ---- */
+    const shellBefore = { lv: player.armor.shell.lv, dur: player.armor.shell.dur };
+    const shellRes = CombatSystem.applyArmor(player.armor.shell, remaining, pen);
+    const shellAfter = { dur: player.armor.shell.dur, broke: player.armor.shell.dur <= 0 };
+    remaining = shellRes.remaining;
 
-  /* 5. 爆头即死（profile 开关）—— 必须用对应体质系数，
-      否则 Prazer(48) 用人类系数(34) 得到 dmg = hp×0.708，永远差一口气不死 */
-if (isHead && profile.get('combat.headshotInstantKill', false)) {
-  if (player.hp > 0) {
-    remaining = player.hp * (player.charSpec.prazer ? COMBAT.BODY_COEFF_PRAZER : COMBAT.BODY_COEFF_HUMAN);
+    const visorBefore = { lv: player.armor.visor.lv, dur: player.armor.visor.dur };
+    const visorRes = CombatSystem.applyArmor(player.armor.visor, remaining, pen);
+    const visorAfter = { dur: player.armor.visor.dur, broke: player.armor.visor.dur <= 0 };
+    remaining = visorRes.remaining;
+
+    /* 快照：优先显示头盔壳吸收，否则面罩 */
+    if (shellRes.absorbed > 0 && shellBefore.lv > 0) {
+      armorSnapshot = {
+        layer: '头盔壳', lv: shellBefore.lv,
+        absorbed: shellRes.absorbed,
+        wear: shellBefore.dur - shellAfter.dur,
+        broke: shellAfter.broke,
+      };
+    } else if (visorRes.absorbed > 0 && visorBefore.lv > 0) {
+      armorSnapshot = {
+        layer: '面罩', lv: visorBefore.lv,
+        absorbed: visorRes.absorbed,
+        wear: visorBefore.dur - visorAfter.dur,
+        broke: visorAfter.broke,
+      };
+    }
   } else {
-    remaining = 0;
+    /* ---- 躯干：plate（插板）→ fiber（纤维） ---- */
+    const plateBefore = { lv: player.armor.plate.lv, dur: player.armor.plate.dur };
+    const plateRes = CombatSystem.applyArmor(player.armor.plate, remaining, pen);
+    const plateAfter = { dur: player.armor.plate.dur, broke: player.armor.plate.dur <= 0 };
+    remaining = plateRes.remaining;
+
+    const fiberBefore = { lv: player.armor.fiber.lv, dur: player.armor.fiber.dur };
+    const fiberRes = CombatSystem.applyArmor(player.armor.fiber, remaining, pen);
+    const fiberAfter = { dur: player.armor.fiber.dur, broke: player.armor.fiber.dur <= 0 };
+    remaining = fiberRes.remaining;
+
+    if (plateRes.absorbed > 0 && plateBefore.lv > 0) {
+      armorSnapshot = {
+        layer: '插板', lv: plateBefore.lv,
+        absorbed: plateRes.absorbed,
+        wear: plateBefore.dur - plateAfter.dur,
+        broke: plateAfter.broke,
+      };
+    } else if (fiberRes.absorbed > 0 && fiberBefore.lv > 0) {
+      armorSnapshot = {
+        layer: '纤维', lv: fiberBefore.lv,
+        absorbed: fiberRes.absorbed,
+        wear: fiberBefore.dur - fiberAfter.dur,
+        broke: fiberAfter.broke,
+      };
+    }
   }
-}
 
-/* 6. 折算 HP 伤害 */
-const dmg = CombatSystem.energyToHP(remaining, player.charSpec.prazer);
-player.hp -= dmg;
-player.taken += dmg;
+  /* ===== 4. 爆头处理（HEAD_MULT + 即死/半死判定） ===== */
+  if (isHead) {
+    remaining *= COMBAT.HEAD_MULT;
 
-  /* 7. 四肢伤害（profile 开关） */
+    const bodyCoeff = player.charSpec.prazer ? COMBAT.BODY_COEFF_PRAZER : COMBAT.BODY_COEFF_HUMAN;
+    const lethalEnergy = player.hp * bodyCoeff;
+
+    if (profile.get('combat.headshotInstantKill', false)) {
+      /* 硬核：头盔被穿透 + 能量足够 → 精确致死 */
+      if (remaining >= lethalEnergy) {
+        remaining = lethalEnergy;
+      }
+      /* 否则：按实际数值扣血（头盔挡住了，不死） */
+    } else {
+      /* 街机：爆头再痛也不致死，最多留 1% HP */
+      if (remaining >= lethalEnergy) {
+        remaining = lethalEnergy * 0.99;
+      }
+    }
+  }
+
+  /* ===== 5. 折算 HP 伤害 ===== */
+  const dmg = CombatSystem.energyToHP(remaining, player.charSpec.prazer);
+  player.hp -= dmg;
+  player.taken += dmg;
+
+  /* ===== 6. 四肢伤害（profile 开关） ===== */
   if (profile.get('combat.limbDamage', false)) {
     player.limbDamage = (player.limbDamage || 0) + 1;
     if (player.limbDamage >= 4) {
@@ -1444,23 +1502,7 @@ player.taken += dmg;
     }
   }
 
-  /* ---- 战斗日志：承受伤害 ---- */
-  let armorSnapshot = null;
-  if (plateRes.absorbed > 0 && plateBefore.lv > 0) {
-    armorSnapshot = {
-      layer: '插板', lv: plateBefore.lv,
-      absorbed: plateRes.absorbed,
-      wear: plateBefore.dur - plateAfter.dur,
-      broke: plateAfter.broke,
-    };
-  } else if (fiberRes.absorbed > 0 && fiberBefore.lv > 0) {
-    armorSnapshot = {
-      layer: '纤维', lv: fiberBefore.lv,
-      absorbed: fiberRes.absorbed,
-      wear: fiberBefore.dur - fiberAfter.dur,
-      broke: fiberAfter.broke,
-    };
-  }
+  /* ===== 7. 战斗日志 ===== */
   this.combatLog.push({
     type: 'damage_taken',
     t: this.time,
@@ -1482,7 +1524,7 @@ player.taken += dmg;
   this._playSFX('hurt', { volume: 0.5 });
 
   if (player.hp <= 0 && player.alive) this._playerDown();
- }
+}
 
  _killEnemy(enemy, dmg, dist){
   enemy.alive = false;
