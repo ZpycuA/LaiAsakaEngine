@@ -2617,6 +2617,10 @@ try {
   if (this.world) {
     try { this.world.destroy(); } catch (e) { console.warn(e); }
     this.world = null;
+        if (this.inventory) {
+      this.engine.save.data.inventory = this.inventory.serialize();
+      this.engine.save.save();
+        }
   }
   // ★ 核心修复 2：空指针保护
   const mob = document.getElementById('mobile-controls');
