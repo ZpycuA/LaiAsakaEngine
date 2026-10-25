@@ -119,6 +119,67 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
 .bar > div{height:100%;width:100%;transition:width .1s;background:linear-gradient(90deg,#d94a4a,#ff8b7b)}
 .bar.cp > div{background:linear-gradient(90deg,#3fa8ff,#8ee7ff)}
 .bar > span{position:absolute;inset:0;text-align:center;font-size:8.5px;line-height:11px;color:#fff;font-weight:600;text-shadow:0 1px 2px #000}
+/* ---------- 护甲耐久格 ---------- */
+.armor-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(105,170,235,.15);
+}
+.armor-cell {
+  position: relative;
+  padding: 3px 2px 2px;
+  background: rgba(10,18,28,.7);
+  border-radius: 4px;
+  border: 1px solid rgba(80,125,175,.2);
+  text-align: center;
+  transition: .15s;
+}
+.armor-cell.empty {
+  opacity: .32;
+  background: rgba(20,26,36,.4);
+}
+.armor-cell.broken {
+  background: rgba(80,20,20,.5);
+  border-color: rgba(255,80,80,.6);
+  animation: armorBlink 1.2s ease-in-out infinite;
+}
+@keyframes armorBlink {
+  0%,100% { box-shadow: inset 0 0 0 rgba(255,80,80,0); }
+  50%     { box-shadow: inset 0 0 8px rgba(255,80,80,.55); }
+}
+.armor-icon {
+  font-size: 14px;
+  line-height: 1;
+  margin-bottom: 3px;
+  opacity: .9;
+}
+.armor-bar {
+  height: 3px;
+  background: rgba(0,0,0,.7);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+.armor-bar > i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg,#6fe07a,#a8e05a);
+  transition: width .15s, background .2s;
+}
+.armor-lv {
+  font-size: 8px;
+  color: #8fb0cc;
+  letter-spacing: .5px;
+  line-height: 1;
+}
+.armor-cell.broken .armor-lv {
+  color: #ff6b6b;
+  font-weight: 700;
+}
 
 /* 右下武器区 */
 #bottom-right{position:absolute;right:16px;bottom:16px;text-align:right;text-shadow:0 2px 8px #000;pointer-events:none}
@@ -376,6 +437,28 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
           <span data-i18n="ui.game.cp">耦合</span>
           <div class="bar cp"><div id="cp-bar"></div><span id="cp-text">100%</span></div>
         </div>
+         <div class="armor-row" id="armor-row">
+  <div class="armor-cell" data-slot="shell" title="头盔壳">
+    <div class="armor-icon">⛑</div>
+    <div class="armor-bar"><i></i></div>
+    <div class="armor-lv">—</div>
+  </div>
+  <div class="armor-cell" data-slot="visor" title="面罩">
+    <div class="armor-icon">🕶</div>
+    <div class="armor-bar"><i></i></div>
+    <div class="armor-lv">—</div>
+  </div>
+  <div class="armor-cell" data-slot="fiber" title="纤维">
+    <div class="armor-icon">🦺</div>
+    <div class="armor-bar"><i></i></div>
+    <div class="armor-lv">—</div>
+  </div>
+  <div class="armor-cell" data-slot="plate" title="插板">
+    <div class="armor-icon">🛡</div>
+    <div class="armor-bar"><i></i></div>
+    <div class="armor-lv">—</div>
+  </div>
+         </div>
       </div>
     </div>
 
