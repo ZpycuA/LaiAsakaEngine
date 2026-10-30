@@ -1337,15 +1337,21 @@ _updatePlayer(dt){
   }
 
   _finishReload(){
-    const p = this.player;
-    const w = this.currentWeapon;
-    if (!w) return;
-    const need = w.magCap - w.mag;
-    const take = Math.min(need, w.reserve);
+  const p = this.player;
+  const w = this.currentWeapon;
+  if (!w) return;
+  const need = w.magCap - w.mag;
+  const take = Math.min(need, w.reserve);
+  if (take > 0) {
     w.mag += take;
-    w.reserve -= take;
-    p.reloading = 0;
+    if (typeof w.consumeReserve === 'function') {
+      w.consumeReserve(take);
+    } else {
+      w.reserve -= take;
+    }
   }
+  p.reloading = 0;
+}
 
  _fireWeapon(owner, weapon, isPlayer){
   if (!weapon || !weapon.def) return;
