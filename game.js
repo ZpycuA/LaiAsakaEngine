@@ -907,6 +907,95 @@ class GameWorld {
     };
   }
 
+  /* ===== Inventory 对接 ===== */
+_buildWeaponFromInventory(inv, equipSlot) {
+  if (!inv) return null;
+  const uid = inv.equipped[equipSlot];
+  if (!uid) return null;
+  const item = inv.items.get(uid);
+  if (!item || item.table !== 'weapons') return null;
+  const def = this.engine.content.get('weapons', item.defId);
+  if (!def) return null;
+  const ammoDef = this.engine.content.get('ammo', def.ammoType);
+  if (item.mag === undefined) item.mag = def.mag;
+
+  const self = this;
+  return {
+    item,
+    def,
+    ammoDef,
+    magCap: def.mag,
+    fireCd: 0,
+    reloading: 0,
+    get mag() { return this.item.mag; },
+    set mag(v) { this.item.mag = Math.max(0, Math.min(this.magCap, v)); },
+    get reserve() { return self._countAmmoInInventory(inv, def.ammoType); },
+    consumeReserve(count) { self._consumeAmmoInInventory(inv, def.ammoType, count); },
+  };
+}
+
+_countAmmoInInventory(inv, ammoType) {
+  if (!inv) return 0;
+  let total = 0;
+  for (const cName of ['chest', 'pocket', 'bag', 'safe']) {
+    const c = inv.containers[cName];
+    if (!c) continue;
+    for (const uid of c.uids) {
+      const item = inv.items.get(uid);
+      if (item && item.table === 'ammo' && item.defId === ammoType) {
+        total += item.qty;
+      }
+    }
+  }
+  return total;
+}
+
+_consumeAmmoInInventory(inv, ammoType, count) {
+  if (!inv || count <= 0) return 0;
+  let remaining = count;
+  for (const cName of ['chest', 'pocket', 'bag', 'safe']) {
+    const c = inv.containers[cName];
+    if (!c) continue;
+    for (let i = c.uids.length - 1; i >= 0 && remaining > 0; i--) {
+      const uid = c.uids[i];
+      const item = inv.items.get(uid);
+      if (!item || item.table !== 'ammo' || item.defId !== ammoType) continue;
+      const take = Math.min(item.qty, remaining);
+      item.qty -= take;
+      remaining -= take;
+      if (item.qty <= 0) inv.destroyItem(uid);
+    }
+  }
+  return count - remaining;
+}
+
+_buildArmorFromInventory(inv) {
+  if (!inv) return null;
+  const result = {};
+  const mapping = [
+    ['helmetShell', 'shell'],
+    ['helmetVisor', 'visor'],
+    ['vestFiber', 'fiber'],
+    ['vestPlate', 'plate'],
+  ];
+  for (const [equipSlot, armorSlot] of mapping) {
+    const uid = inv.equipped[equipSlot];
+    if (!uid) { result[armorSlot] = { lv: 0, dur: 0, max: 0 }; continue; }
+    const item = inv.items.get(uid);
+    if (!item) { result[armorSlot] = { lv: 0, dur: 0, max: 0 }; continue; }
+    const def = this.engine.content.get(item.table, item.defId);
+    if (!def || !def.armorLv) { result[armorSlot] = { lv: 0, dur: 0, max: 0 }; continue; }
+    result[armorSlot] = {
+      item,
+      lv: def.armorLv,
+      max: item.durMax,
+      get dur() { return this.item.dur; },
+      set dur(v) { this.item.dur = v; },
+    };
+  }
+  return result;
+}
+
   _buildSkills(skillIds){
     const result = [];
     for (let i = 0; i < skillIds.length; i++) {
