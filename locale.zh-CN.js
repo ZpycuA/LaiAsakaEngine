@@ -73,7 +73,7 @@ export default {
   'content.vestFiber.lv4.name': '4 级纤维护甲',
   'content.vestPlate.lv4.name': '4 级防弹插板',
   'content.vestPlate.lv5.name': '5 级防弹插板',
-  'content.backpack.small.name': '小型背包'
+  'content.backpack.small.name': '小型背包',
   'content.backpack.medium.name': '中型背包',
   'content.backpack.large.name': '大型背包',
   'content.chestRig.small.name': '小型胸挂',
