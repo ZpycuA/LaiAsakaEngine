@@ -2622,18 +2622,18 @@ try {
 }
 
     _quitToMenu(){
+  if (document.pointerLockElement) document.exitPointerLock();
   if (this.world) {
     try { this.world.destroy(); } catch (e) { console.warn(e); }
     this.world = null;
-        if (this.inventory) {
+    if (this.inventory) {
       this.engine.save.data.inventory = this.inventory.serialize();
       this.engine.save.save();
-        }
+    }
   }
-  // ★ 核心修复 2：空指针保护
   const mob = document.getElementById('mobile-controls');
   if (mob) mob.style.display = 'none';
-  
+
   this._showScreen('menu');
   if (this.engine.save.refreshMenu) this.engine.save.refreshMenu();
 }
