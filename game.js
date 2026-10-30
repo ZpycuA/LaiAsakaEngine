@@ -2467,13 +2467,19 @@ if (gyroSens) {
   }
        // 初始化库存
 
-   _ensureInitialInventory(){
+   _ensureInitialInventory(forceReset){
   const inv = this.inventory;
   if (!inv) return;
   const data = this.engine.save.data;
   if (!data) return;
   if (!data.flags) data.flags = {};
-  if (data.flags.initialInventoryGiven) return;
+
+  if (forceReset) {
+    this._stripInventoryForLoadout();
+  } else {
+    // 已有主武器 → 视为已配装，继承，不覆盖
+    if (inv.equipped.main) return;
+  }
 
   const charSpec = this.engine.content.get('characters', this.menuState.char);
   if (!charSpec) return;
@@ -2509,23 +2515,48 @@ if (gyroSens) {
     if (uid) inv.equip('chestRig', uid);
   }
 
+  // 弹药放进 bag/chest（战斗中可从身上拿），不放 stash
+  const giveAmmo = (ammoType, qty) => {
+    const uid = inv.createItem('ammo', ammoType, { qty });
+    if (!uid) return;
+    if (inv.addToContainer('bag', uid).ok) return;
+    if (inv.addToContainer('chest', uid).ok) return;
+    inv.addToContainer('stash', uid);
+  };
+
   if (charSpec.weapon) {
     const wDef = this.engine.content.get('weapons', charSpec.weapon);
-    if (wDef) {
-      const uid = inv.createItem('ammo', wDef.ammoType, { qty: 120 });
-      if (uid) inv.addToContainer('stash', uid);
-    }
+    if (wDef) giveAmmo(wDef.ammoType, 120);
   }
   if (charSpec.sidearm) {
     const sDef = this.engine.content.get('weapons', charSpec.sidearm);
-    if (sDef) {
-      const uid = inv.createItem('ammo', sDef.ammoType, { qty: 60 });
-      if (uid) inv.addToContainer('stash', uid);
-    }
+    if (sDef) giveAmmo(sDef.ammoType, 60);
   }
 
   data.flags.initialInventoryGiven = true;
   this.engine.save.save();
+}
+
+_stripInventoryForLoadout(){
+  const inv = this.inventory;
+  if (!inv) return;
+  for (const slot of ['main', 'side', 'helmetShell', 'helmetVisor', 'helmetEar', 'vestFiber', 'vestPlate', 'backpack', 'chestRig']) {
+    const uid = inv.equipped[slot];
+    if (uid) {
+      inv.unequip(slot);
+      inv.destroyItem(uid);
+    }
+  }
+  // 清空身上容器（safe 也清，因为制式券是重新配装）；stash 保留
+  for (const cName of ['chest', 'pocket', 'bag', 'safe']) {
+    const c = inv.containers[cName];
+    if (!c) continue;
+    const uids = c.uids.slice();
+    for (const uid of uids) {
+      inv.removeFromContainer(cName, uid);
+      inv.destroyItem(uid);
+    }
+  }
 }
    
 startMatch(kind){
