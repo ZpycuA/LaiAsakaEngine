@@ -2684,12 +2684,38 @@ try {
     save.data.stats.kills = (save.data.stats.kills || 0) + (stats.kills || 0);
 
     let baseReward = 0;
-    if (success) baseReward += 500;
-    baseReward += (stats.kills || 0) * 30;
-    baseReward += (stats.carriedValue || 0);
-    const finalReward = Math.round(baseReward * assessment.rewardMul);
-    save.data.credits = (save.data.credits || 0) + finalReward;
-    save.save();
+if (success) baseReward += 500;
+baseReward += (stats.kills || 0) * 30;
+baseReward += (stats.carriedValue || 0);
+const finalReward = Math.round(baseReward * assessment.rewardMul);
+save.data.credits = (save.data.credits || 0) + finalReward;
+
+// ★ Inventory 结算：失败掉落装备与身上容器，安全箱保留；成功全部保留
+try {
+  const inv = this.inventory;
+  if (inv) {
+    if (!success) {
+      for (const slot of ['main', 'side', 'helmetShell', 'helmetVisor', 'helmetEar', 'vestFiber', 'vestPlate', 'backpack', 'chestRig']) {
+        const uid = inv.equipped[slot];
+        if (uid) { inv.unequip(slot); inv.destroyItem(uid); }
+      }
+      for (const cName of ['chest', 'pocket', 'bag']) {
+        const c = inv.containers[cName];
+        if (!c) continue;
+        const uids = c.uids.slice();
+        for (const uid of uids) {
+          inv.removeFromContainer(cName, uid);
+          inv.destroyItem(uid);
+        }
+      }
+    }
+    save.data.inventory = inv.serialize();
+  }
+} catch (e) {
+  console.warn('[GameApp] Inventory 结算失败', e);
+}
+
+save.save();
 
     /* ---- 结束日志 ---- */
     const world = this.world;
