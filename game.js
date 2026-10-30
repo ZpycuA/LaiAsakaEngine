@@ -2593,26 +2593,32 @@ try {
 }
 
   _togglePause(force){
-    if (!this.world || !this.world.running) return;
-    const pauseScreen = document.getElementById('pause-screen');
-    const isPaused = this.world.paused;
-    const target = force !== undefined ? force : !isPaused;
+  if (!this.world || !this.world.running) return;
+  const pauseScreen = document.getElementById('pause-screen');
+  const isPaused = this.world.paused;
+  const target = force !== undefined ? force : !isPaused;
 
-    if (target) {
-      this.world.pause();
-      pauseScreen.classList.add('on');
-      const statsEl = document.getElementById('pause-stats');
-      if (statsEl) {
-        const p = this.world.player;
-        statsEl.innerHTML =
-          `击杀：<b>${p.kills}</b>　存活：<b>${Math.round(this.world.time)}s</b><br>` +
-          `携带物资：<b>${p.carriedValue} cp</b>`;
-      }
-    } else {
-      this.world.resume();
-      pauseScreen.classList.remove('on');
+  if (target) {
+    this.world.pause();
+    pauseScreen.classList.add('on');
+    if (document.pointerLockElement) document.exitPointerLock();
+    const statsEl = document.getElementById('pause-stats');
+    if (statsEl) {
+      const p = this.world.player;
+      statsEl.innerHTML =
+        `击杀：<b>${p.kills}</b>　存活：<b>${Math.round(this.world.time)}s</b><br>` +
+        `携带物资：<b>${p.carriedValue} cp</b>`;
+    }
+  } else {
+    this.world.resume();
+    pauseScreen.classList.remove('on');
+    /* 从暂停恢复：用户点"继续"是手势事件，直接重新锁鼠标 */
+    const canvas = this.engine.renderer.canvas;
+    if (typeof canvas.requestPointerLock === 'function') {
+      try { canvas.requestPointerLock(); } catch (_) {}
     }
   }
+}
 
     _quitToMenu(){
   if (this.world) {
