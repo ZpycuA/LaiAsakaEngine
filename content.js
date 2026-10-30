@@ -84,6 +84,55 @@ const AMMO = {
   c.registerAll('armor', ARMOR);
 
   /* ==========================================================
+   3.5 装备部位
+   ----------------------------------------------------------
+   armorLv:  引用 armor 表的等级（1~5，0 表示无防护）
+   maxDur:   耐久上限
+   cap:      容器容量（仅背包/胸挂）
+   ========================================================== */
+const HELMET_SHELL = {
+  lv3: { name: 'content.helmetShell.lv3.name', armorLv: 3, maxDur: 100 },
+  lv4: { name: 'content.helmetShell.lv4.name', armorLv: 4, maxDur: 100 },
+};
+c.registerAll('helmetShell', HELMET_SHELL);
+
+const HELMET_VISOR = {
+  lv3: { name: 'content.helmetVisor.lv3.name', armorLv: 3, maxDur: 100 },
+  lv4: { name: 'content.helmetVisor.lv4.name', armorLv: 4, maxDur: 100 },
+};
+c.registerAll('helmetVisor', HELMET_VISOR);
+
+const HELMET_EAR = {
+  basic: { name: 'content.helmetEar.basic.name', maxDur: 100 },
+};
+c.registerAll('helmetEar', HELMET_EAR);
+
+const VEST_FIBER = {
+  lv3: { name: 'content.vestFiber.lv3.name', armorLv: 3, maxDur: 100 },
+  lv4: { name: 'content.vestFiber.lv4.name', armorLv: 4, maxDur: 100 },
+};
+c.registerAll('vestFiber', VEST_FIBER);
+
+const VEST_PLATE = {
+  lv4: { name: 'content.vestPlate.lv4.name', armorLv: 4, maxDur: 100 },
+  lv5: { name: 'content.vestPlate.lv5.name', armorLv: 5, maxDur: 100 },
+};
+c.registerAll('vestPlate', VEST_PLATE);
+
+const BACKPACK = {
+  small: { name: 'content.backpack.small.name', cap: 8 },
+  medium: { name: 'content.backpack.medium.name', cap: 16 },
+  large: { name: 'content.backpack.large.name', cap: 24 },
+};
+c.registerAll('backpack', BACKPACK);
+
+const CHEST_RIG = {
+  small: { name: 'content.chestRig.small.name', cap: 4 },
+  large: { name: 'content.chestRig.large.name', cap: 6 },
+};
+c.registerAll('chestRig', CHEST_RIG);
+
+  /* ==========================================================
      4. 敌人
      ----------------------------------------------------------
      weapon:  引用武器 id
