@@ -2194,17 +2194,10 @@ export class GameApp {
   this._bindGlobalHandlers();
   this._registerDevCommands();
 
-  // ★ 初始化库存（放在方法内，不能放 class body）
   this.inventory = new Inventory(this.engine.content);
   if (this.engine.save.data && this.engine.save.data.inventory) {
-    try { this.inventory.deserialize(this.engine.save.data.inventory); }
-    catch (e) { console.warn('[Bag] 库存反序列化失败，重置', e); }
-  }
-  if (this.inventory.items.size === 0) {
-    const w = this.inventory.createItem('weapons', 'p9');
-    if (w) this.inventory.equip('main', w);
-    const a = this.inventory.createItem('ammo', '9mm', { qty: 60 });
-    if (a) this.inventory.addToContainer('stash', a);
+  try { this.inventory.deserialize(this.engine.save.data.inventory); }
+  catch (e) { console.warn('[Bag] 库存反序列化失败，重置', e); }
   }
   this.bagUI = new BagUI(this.engine, this.inventory);
 }
