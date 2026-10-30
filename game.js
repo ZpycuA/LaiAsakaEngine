@@ -2357,9 +2357,18 @@ export class GameApp {
     this.startMatch(this._lastMatchKind);
   });
   document.getElementById('btn-menu')?.addEventListener('click', () => {
-    document.getElementById('result-screen')?.classList.remove('on');
-    this._quitToMenu();
-  });
+  document.getElementById('result-screen')?.classList.remove('on');
+  this._quitToMenu();
+});
+
+document.getElementById('btn-loadout-ticket')?.addEventListener('click', () => {
+  if (!this.inventory) return;
+  this._ensureInitialInventory(true);
+  if (this.bagUI) this.bagUI.refresh();
+  const charSpec = this.engine.content.get('characters', this.menuState.char);
+  const charName = charSpec ? this.engine.i18n.t(charSpec.name) : '当前角色';
+  alert('制式券已发放：' + charName + ' 标准配装。按 B 打开背包查看。');
+});
 
   window.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape' && this.world && this.world.running) {
