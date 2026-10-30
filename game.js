@@ -2659,20 +2659,23 @@ try {
     return ok;
   }
 _bindCameraControls() {
-  if (this._camBound) return;
-  this._camBound = true;
   const canvas = this.engine.renderer.canvas;
   const e = this.engine;
 
   /* ==================================================
-     平台判据：与 _setupMobileControls 完全一致
+     每次重新绑定前，先 abort 上一轮所有监听器。
+     取代 _camBound 一次性锁定 → 支持 PC↔移动端切换。
      ================================================== */
+  if (this._camAbort) {
+    try { this._camAbort.abort(); } catch (_) {}
+  }
+  this._camAbort = new AbortController();
+  const sig = { signal: this._camAbort.signal };
+
   let isMobile = this.platform === 'mobile';
   if (this.platform === 'auto') isMobile = 'ontouchstart' in window;
 
-  /* ==================================================
-     PC 端 · Pointer Lock（首选）+ 拖拽兜底
-     ================================================== */
+  /* ============== PC 端 · Pointer Lock（仅非移动端注册） ============== */
   if (!isMobile) {
     let lockSupported = typeof canvas.requestPointerLock === 'function';
     let fallbackDrag = false;
@@ -2684,51 +2687,45 @@ _bindCameraControls() {
       if (!lockSupported) return;
       try {
         const p = canvas.requestPointerLock();
-        if (p && typeof p.catch === 'function') {
-          p.catch(() => { lockSupported = false; });
-        }
-      } catch (_) {
-        lockSupported = false;
-      }
+        if (p && typeof p.catch === 'function') p.catch(() => { lockSupported = false; });
+      } catch (_) { lockSupported = false; }
     };
 
-    canvas.addEventListener('click', tryLock);
+    canvas.addEventListener('click', tryLock, sig);
 
     document.addEventListener('pointerlockchange', () => {
       const locked = document.pointerLockElement === canvas;
       document.body.style.cursor = locked ? 'none' : '';
       if (!locked) fallbackDrag = false;
-    });
+    }, sig);
 
     document.addEventListener('pointerlockerror', () => {
-      console.warn('[Camera] Pointer Lock 不可用，降级为拖拽模式');
+      console.warn('[Camera] Pointer Lock 不可用，降级为拖拽');
       lockSupported = false;
-    });
+    }, sig);
 
     document.addEventListener('mousemove', (ev) => {
       if (document.pointerLockElement === canvas) {
         e.cameraCtl.rotate(ev.movementX || 0, ev.movementY || 0);
         return;
       }
-      /* 兜底：pointer lock 失败时，左键拖拽仍可用 */
       if (fallbackDrag && (ev.buttons & 1)) {
         e.cameraCtl.rotate(ev.movementX || 0, ev.movementY || 0);
       }
-    });
+    }, sig);
 
     canvas.addEventListener('mousedown', (ev) => {
       if (ev.button === 0 && lockSupported === false) fallbackDrag = true;
-    });
-    canvas.addEventListener('mouseup', () => { fallbackDrag = false; });
-    canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
-    canvas.addEventListener('blur', () => { fallbackDrag = false; });
-
-    return;
+    }, sig);
+    canvas.addEventListener('mouseup', () => { fallbackDrag = false; }, sig);
+    canvas.addEventListener('contextmenu', (ev) => ev.preventDefault(), sig);
+    canvas.addEventListener('blur', () => { fallbackDrag = false; }, sig);
   }
 
-  /* ==================================================
-     移动端 · 多点触控（保持原逻辑）
-     ================================================== */
+  /* ============== 移动端 · 触摸（无条件注册，与平台判定无关） ==============
+     放在 if 外，确保 PC↔移动切换、auto 判定失败等场景下触摸逻辑永远在。
+     在 PC 上触摸事件不触发（鼠标不产生 touch），互不干扰。
+     ==================================================================== */
   canvas.addEventListener('touchstart', (ev) => {
     ev.preventDefault();
     for (let i = 0; i < ev.changedTouches.length; i++) {
@@ -2741,7 +2738,7 @@ _bindCameraControls() {
         e.input.startRightDrag(t.clientX, t.clientY, t.identifier);
       }
     }
-  }, { passive: false });
+  }, Object.assign({ passive: false }, sig));
 
   canvas.addEventListener('touchmove', (ev) => {
     ev.preventDefault();
@@ -2754,7 +2751,7 @@ _bindCameraControls() {
         if (delta) e.cameraCtl.rotate(delta.dx * 1.5, delta.dy * 1.5);
       }
     }
-  }, { passive: false });
+  }, Object.assign({ passive: false }, sig));
 
   const endTouch = (ev) => {
     ev.preventDefault();
@@ -2767,9 +2764,10 @@ _bindCameraControls() {
       }
     }
   };
-  canvas.addEventListener('touchend', endTouch, { passive: false });
-  canvas.addEventListener('touchcancel', endTouch, { passive: false });
+  canvas.addEventListener('touchend', endTouch, Object.assign({ passive: false }, sig));
+  canvas.addEventListener('touchcancel', endTouch, Object.assign({ passive: false }, sig));
 }
+  
 
 
 
