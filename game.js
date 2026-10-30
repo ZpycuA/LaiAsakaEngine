@@ -850,6 +850,11 @@ class GameWorld {
   weaponGroup.position.set(0.25, -0.2, -0.4);
   this.engine.renderer.camera.add(weaponGroup);
 
+  const inv = this.engine.app ? this.engine.app.inventory : null;
+  const invMain = this._buildWeaponFromInventory(inv, 'main');
+  const invSide = this._buildWeaponFromInventory(inv, 'side');
+  const invArmor = this._buildArmorFromInventory(inv);
+  
   this.player = {
     mesh, body,
     weaponGroup, // ★ 存入玩家对象
@@ -863,25 +868,25 @@ class GameWorld {
     protectionHold: false,
     angle: 0,
     weapon: invMain || this._buildWeapon(spec.weapon),
-sidearm: invSide || (spec.sidearm ? this._buildWeapon(spec.sidearm) : null),
-usingSidearm: false,
-fireCd: 0,
-reloading: 0,
-reloadTime: 0,
-alive: true,
-kills: 0,
-dealt: 0,
-taken: 0,
-carriedValue: 0,
-limbDamage: 0,
-speedMul: 1,
-stamina: 100,
-maxStamina: 100,
-armor: invArmor || {
-  shell: { lv: 3, dur: 100, max: 100 },
-  visor: { lv: 3, dur: 100, max: 100 },
-  fiber: { lv: 4, dur: 100, max: 100 },
-  plate: { lv: 4, dur: 100, max: 100 },
+    sidearm: invSide || (spec.sidearm ? this._buildWeapon(spec.sidearm) : null),
+    usingSidearm: false,
+    fireCd: 0,
+    reloading: 0,
+    reloadTime: 0,
+    alive: true,
+    kills: 0,
+    dealt: 0,
+    taken: 0,
+    carriedValue: 0,
+    limbDamage: 0,
+    speedMul: 1,
+    stamina: 100,
+    maxStamina: 100,
+    armor: invArmor || {
+       shell: { lv: 3, dur: 100, max: 100 },
+       visor: { lv: 3, dur: 100, max: 100 },
+       fiber: { lv: 4, dur: 100, max: 100 },
+       plate: { lv: 4, dur: 100, max: 100 },
 },
     skills: this._buildSkills(spec.skills || []),
   };
