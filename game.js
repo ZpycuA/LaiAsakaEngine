@@ -2425,8 +2425,9 @@ hideCombatReport();
   }
 }
 
-  _onMatchEnd(success, stats){
+_onMatchEnd(success, stats){
 try {
+  if (document.pointerLockElement) document.exitPointerLock();
   const e = this.engine;
   const save = e.save;
   const assessment = e.profile.assess();
