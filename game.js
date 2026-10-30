@@ -2473,9 +2473,69 @@ if (gyroSens) {
     });
   }
        // 初始化库存
- 
+
+   _ensureInitialInventory(){
+  const inv = this.inventory;
+  if (!inv) return;
+  const data = this.engine.save.data;
+  if (!data) return;
+  if (!data.flags) data.flags = {};
+  if (data.flags.initialInventoryGiven) return;
+
+  const charSpec = this.engine.content.get('characters', this.menuState.char);
+  if (!charSpec) return;
+
+  if (!inv.equipped.main && charSpec.weapon) {
+    const uid = inv.createItem('weapons', charSpec.weapon);
+    if (uid) inv.equip('main', uid);
+  }
+  if (!inv.equipped.side && charSpec.sidearm) {
+    const uid = inv.createItem('weapons', charSpec.sidearm);
+    if (uid) inv.equip('side', uid);
+  }
+
+  const armorSlots = [
+    ['helmetShell', 'helmetShell', 'lv3'],
+    ['helmetVisor', 'helmetVisor', 'lv3'],
+    ['vestFiber', 'vestFiber', 'lv4'],
+    ['vestPlate', 'vestPlate', 'lv4'],
+  ];
+  for (const [slot, table, defId] of armorSlots) {
+    if (!inv.equipped[slot]) {
+      const uid = inv.createItem(table, defId);
+      if (uid) inv.equip(slot, uid);
+    }
+  }
+
+  if (!inv.equipped.backpack) {
+    const uid = inv.createItem('backpack', 'medium');
+    if (uid) inv.equip('backpack', uid);
+  }
+  if (!inv.equipped.chestRig) {
+    const uid = inv.createItem('chestRig', 'large');
+    if (uid) inv.equip('chestRig', uid);
+  }
+
+  if (charSpec.weapon) {
+    const wDef = this.engine.content.get('weapons', charSpec.weapon);
+    if (wDef) {
+      const uid = inv.createItem('ammo', wDef.ammoType, { qty: 120 });
+      if (uid) inv.addToContainer('stash', uid);
+    }
+  }
+  if (charSpec.sidearm) {
+    const sDef = this.engine.content.get('weapons', charSpec.sidearm);
+    if (sDef) {
+      const uid = inv.createItem('ammo', sDef.ammoType, { qty: 60 });
+      if (uid) inv.addToContainer('stash', uid);
+    }
+  }
+
+  data.flags.initialInventoryGiven = true;
+  this.engine.save.save();
+}
    
-    startMatch(kind){
+startMatch(kind){
   const e = this.engine;
   this._lastMatchKind = kind;
 
@@ -2502,12 +2562,14 @@ hideCombatReport();
   this._bindCameraControls();
 
   if (this.world) {
-    try { this.world.destroy(); } catch (err) { console.warn(err); }
-    this.world = null;
-  }
+  try { this.world.destroy(); } catch (err) { console.warn(err); }
+  this.world = null;
+}
 
-  try {
-    this.world = new GameWorld(e, {
+this._ensureInitialInventory();
+
+try {
+  this.world = new GameWorld(e, {
       mapId: this.menuState.map,
       charId: this.menuState.char,
       diffId: this.menuState.diff,
