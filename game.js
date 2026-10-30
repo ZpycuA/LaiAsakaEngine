@@ -2657,27 +2657,77 @@ _bindCameraControls() {
   const canvas = this.engine.renderer.canvas;
   const e = this.engine;
 
-  // PC端
-  let mouseDrag = false;
-  canvas.addEventListener('mousedown', () => mouseDrag = true);
-  window.addEventListener('mouseup', () => mouseDrag = false);
-  window.addEventListener('mousemove', (ev) => {
-    if (mouseDrag) e.cameraCtl.rotate(ev.movementX, ev.movementY);
-  });
+  /* ==================================================
+     平台判据：与 _setupMobileControls 完全一致
+     ================================================== */
+  let isMobile = this.platform === 'mobile';
+  if (this.platform === 'auto') isMobile = 'ontouchstart' in window;
 
-  // 移动端原生多点触控
+  /* ==================================================
+     PC 端 · Pointer Lock（首选）+ 拖拽兜底
+     ================================================== */
+  if (!isMobile) {
+    let lockSupported = typeof canvas.requestPointerLock === 'function';
+    let fallbackDrag = false;
+
+    const tryLock = () => {
+      if (!this.world || !this.world.running || this.world.paused) return;
+      if (this.bagUI && this.bagUI.open) return;
+      if (document.pointerLockElement === canvas) return;
+      if (!lockSupported) return;
+      try {
+        const p = canvas.requestPointerLock();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => { lockSupported = false; });
+        }
+      } catch (_) {
+        lockSupported = false;
+      }
+    };
+
+    canvas.addEventListener('click', tryLock);
+
+    document.addEventListener('pointerlockchange', () => {
+      const locked = document.pointerLockElement === canvas;
+      document.body.style.cursor = locked ? 'none' : '';
+      if (!locked) fallbackDrag = false;
+    });
+
+    document.addEventListener('pointerlockerror', () => {
+      console.warn('[Camera] Pointer Lock 不可用，降级为拖拽模式');
+      lockSupported = false;
+    });
+
+    document.addEventListener('mousemove', (ev) => {
+      if (document.pointerLockElement === canvas) {
+        e.cameraCtl.rotate(ev.movementX || 0, ev.movementY || 0);
+        return;
+      }
+      /* 兜底：pointer lock 失败时，左键拖拽仍可用 */
+      if (fallbackDrag && (ev.buttons & 1)) {
+        e.cameraCtl.rotate(ev.movementX || 0, ev.movementY || 0);
+      }
+    });
+
+    canvas.addEventListener('mousedown', (ev) => {
+      if (ev.button === 0 && lockSupported === false) fallbackDrag = true;
+    });
+    canvas.addEventListener('mouseup', () => { fallbackDrag = false; });
+    canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    canvas.addEventListener('blur', () => { fallbackDrag = false; });
+
+    return;
+  }
+
+  /* ==================================================
+     移动端 · 多点触控（保持原逻辑）
+     ================================================== */
   canvas.addEventListener('touchstart', (ev) => {
-    // 阻止默认事件（防止缩放/滚动/选中）
-    ev.preventDefault(); 
+    ev.preventDefault();
     for (let i = 0; i < ev.changedTouches.length; i++) {
       const t = ev.changedTouches[i];
-      // 判断是否点在了 UI 按钮上
       const el = document.elementFromPoint(t.clientX, t.clientY);
-      if (el && (el.closest('.mobile-btn') || el.closest('button'))) {
-        continue; // 点按钮就跳过，交给按钮自己的监听器处理
-      }
-
-      // 严格的左右屏划分：左半屏摇杆，右半屏视角
+      if (el && (el.closest('.mobile-btn') || el.closest('button'))) continue;
       if (t.clientX < window.innerWidth * 0.45) {
         e.input.startLeftStick(t.clientX, t.clientY, t.identifier);
       } else {
@@ -2690,14 +2740,11 @@ _bindCameraControls() {
     ev.preventDefault();
     for (let i = 0; i < ev.changedTouches.length; i++) {
       const t = ev.changedTouches[i];
-      
       if (e.input.touch.left && e.input.touch.left.id === t.identifier) {
         e.input.moveLeftStick(t.clientX, t.clientY);
       } else if (e.input.touch.right && e.input.touch.right.id === t.identifier) {
         const delta = e.input.moveRightDrag(t.clientX, t.clientY);
-        if (delta) {
-          e.cameraCtl.rotate(delta.dx * 1.5, delta.dy * 1.5);
-        }
+        if (delta) e.cameraCtl.rotate(delta.dx * 1.5, delta.dy * 1.5);
       }
     }
   }, { passive: false });
