@@ -1782,32 +1782,89 @@ _addKillFeed(name, dmg, dist) {
     this._log('正在搜索…', 'p');
   }
 
-  _finishSearch(){
-    const c = this._searchTarget;
-    this._searching = false;
-    this._searchTimer = 0;
-    this._searchTarget = null;
-    if (!c) return;
-    c.opened = true;
-    if (c.mesh) {
-      c.mesh.material.emissive = new THREE.Color(0x000000);
-      c.mesh.material.color = new THREE.Color(0x3a3a3a);
+  _generateLoot(){
+  const inv = this.engine.app ? this.engine.app.inventory : null;
+  if (!inv) return [];
+  const results = [];
+
+  // 1. 弹药（55%）
+  if (Math.random() < 0.55) {
+    const types = ['9mm', '5.56', '7.62', '.45acp', '12ga'];
+    const at = types[Math.floor(Math.random() * types.length)];
+    const qty = 15 + Math.floor(Math.random() * 45);
+    const uid = inv.createItem('ammo', at, { qty });
+    if (uid) {
+      if (inv.addToContainer('bag', uid).ok) results.push({ uid, name: at, qty });
+      else inv.destroyItem(uid);
     }
-    const lootValue = 100 + Math.floor(Math.random() * 400);
-    this.player.carriedValue += lootValue;
-    this.combatLog.push({
-  type: 'search', t: this.time,
-  containerType: '物资容器',
-});
-    this.tasks.progress('loot', 1);
-    this._log('搜索完成 · 获得物资 ' + lootValue + ' cp', 'g');
-    this.combatLog.push({
-  type: 'loot', t: this.time,
-  name: '物资箱战利品',
-  value: lootValue,
-  qty: 1,
-});
   }
+
+  // 2. 护甲 / 武器（一次判定，二选一）
+  const second = Math.random();
+  if (second < 0.28) {
+    const armorTable = ['helmetShell', 'helmetVisor', 'vestFiber', 'vestPlate'][Math.floor(Math.random() * 4)];
+    const defIds = {
+      helmetShell: ['lv3', 'lv4'],
+      helmetVisor: ['lv3', 'lv4'],
+      vestFiber:   ['lv3', 'lv4'],
+      vestPlate:   ['lv4', 'lv5'],
+    }[armorTable];
+    const defId = defIds[Math.floor(Math.random() * defIds.length)];
+    const uid = inv.createItem(armorTable, defId);
+    if (uid) {
+      if (inv.addToContainer('bag', uid).ok) results.push({ uid, name: defId });
+      else inv.destroyItem(uid);
+    }
+  } else if (second < 0.42) {
+    const weapons = ['p9', 'smg45', 'ak762'];
+    const wid = weapons[Math.floor(Math.random() * weapons.length)];
+    const uid = inv.createItem('weapons', wid);
+    if (uid) {
+      if (inv.addToContainer('bag', uid).ok) results.push({ uid, name: wid });
+      else inv.destroyItem(uid);
+    }
+  }
+
+  return results;
+  }
+   
+  _finishSearch(){
+  const c = this._searchTarget;
+  this._searching = false;
+  this._searchTimer = 0;
+  this._searchTarget = null;
+  if (!c) return;
+  c.opened = true;
+  if (c.mesh) {
+    c.mesh.material.emissive = new THREE.Color(0x000000);
+    c.mesh.material.color = new THREE.Color(0x3a3a3a);
+  }
+  this.combatLog.push({
+    type: 'search', t: this.time,
+    containerType: '物资容器',
+  });
+
+  const loot = this._generateLoot();
+  let totalValue = 0;
+  for (const l of loot) {
+    const val = 50 + Math.floor(Math.random() * 200);
+    totalValue += val;
+    this.combatLog.push({
+      type: 'loot', t: this.time,
+      name: l.name || '物资',
+      value: val,
+      qty: l.qty || 1,
+    });
+  }
+  this.player.carriedValue += totalValue;
+  this.tasks.progress('loot', 1);
+
+  if (loot.length === 0) {
+    this._log('搜索完成 · 背包已满，无法拾取', 'y');
+  } else {
+    this._log('搜索完成 · 拾取 ' + loot.length + ' 件物资（约 ' + totalValue + ' cp）', 'g');
+  }
+}
 
   _useSkill(slot){
     const p = this.player;
