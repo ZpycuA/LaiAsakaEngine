@@ -85,9 +85,18 @@ export class BagUI {
     window.addEventListener('pointerup', (e) => this._onUp(e));
   }
 
-  toggle() { this.open ? this.close() : this.show(); }
-  show() { this.open = true; document.getElementById('bagui-overlay').classList.add('on'); this.refresh(); }
-  close() { this.open = false; document.getElementById('bagui-overlay').classList.remove('on'); this._cancelDrag(); }
+toggle() { this.open ? this.close() : this.show(); }
+show() {
+  if (document.pointerLockElement) document.exitPointerLock();
+  this.open = true;
+  document.getElementById('bagui-overlay').classList.add('on');
+  this.refresh();
+}
+close() {
+  this.open = false;
+  document.getElementById('bagui-overlay').classList.remove('on');
+  this._cancelDrag();
+}
 
   refresh() {
     if (!this.open) return;
