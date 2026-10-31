@@ -35,7 +35,7 @@ const COMBAT = Object.freeze({
   PROTECT_ABSORB: { L1_MELEE: 1.0, L2_BALLISTIC: 0.7, L3_BALLISTIC: 0.5 },
   EXTRACT_TIME: 8,
   SEARCH_TIME: 2.5,
-  SEARCH_RADIUS: 2.5,
+  SEARCH_RADIUS: 3.5,
   EXTRACT_RADIUS: 4.5,
 });
 
@@ -1106,10 +1106,20 @@ _buildArmorFromInventory(inv) {
     } while (Math.hypot(cx, cz) < 8 && tries < 40);
 
     const mesh = this.engine.meshes.build('container', {});
-    mesh.position.x = cx;
-    mesh.position.z = cz;
-    this.engine.renderer.scene.add(mesh);
-    this.containers.push({ x: cx, z: cz, mesh, opened: false, loot: null, revealed: [], searched: false });
+mesh.position.x = cx;
+mesh.position.z = cz;
+this.engine.renderer.scene.add(mesh);
+
+// 加静态物理体，防止玩家穿模
+const cBody = this.physics.add(new Body({
+  x: cx, z: cz,
+  isStatic: true,
+  shape: 'circle',
+  radius: 0.9,
+  userData: { type: 'container' },
+}));
+
+this.containers.push({ x: cx, z: cz, mesh, body: cBody, opened: false, loot: null, revealed: [], searched: false });
     
     // ★ 将容器加入小地图兴趣点
     this.pois.push({ x: cx, z: cz, type: 'container', color: '#ffcc33' });
@@ -1933,7 +1943,13 @@ _closeSearch(){
 
 _updateSearchHint(){
   const el = document.getElementById('search-hint');
-  if (!el) return;
+  if (!el) {
+    if (!this._hintWarnTime || this.time - this._hintWarnTime > 5) {
+      this._hintWarnTime = this.time;
+      console.warn('[Search] #search-hint 元素不存在，请检查 index.html');
+    }
+    return;
+  }
   if (this._searching) { el.classList.remove('on'); return; }
   const c = this._searchTarget;
   if (c && !(c.searched && c.revealed && c.revealed.length === 0)) {
