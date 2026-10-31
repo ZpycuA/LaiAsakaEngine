@@ -1774,13 +1774,179 @@ _addKillFeed(name, dmg, dist) {
     }
   }
 
-  _trySearchContainer(){
-    if (this._searching) return;
-    if (!this._searchTarget) { this._log('附近没有可搜索的容器', 'y'); return; }
-    this._searching = true;
-    this._searchTimer = 0;
-    this._log('正在搜索…', 'p');
+  _esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+_generateLootSpecs(){
+  const specs = [];
+  if (Math.random() < 0.55) {
+    const types = ['9mm', '5.56', '7.62', '.45acp', '12ga'];
+    const at = types[Math.floor(Math.random() * types.length)];
+    specs.push({ table: 'ammo', defId: at, qty: 15 + Math.floor(Math.random() * 45) });
   }
+  const r = Math.random();
+  if (r < 0.28) {
+    const armorTable = ['helmetShell', 'helmetVisor', 'vestFiber', 'vestPlate'][Math.floor(Math.random() * 4)];
+    const defIds = {
+      helmetShell: ['lv3', 'lv4'],
+      helmetVisor: ['lv3', 'lv4'],
+      vestFiber:   ['lv3', 'lv4'],
+      vestPlate:   ['lv4', 'lv5'],
+    }[armorTable];
+    specs.push({ table: armorTable, defId: defIds[Math.floor(Math.random() * defIds.length)] });
+  } else if (r < 0.42) {
+    const weapons = ['p9', 'smg45', 'ak762'];
+    specs.push({ table: 'weapons', defId: weapons[Math.floor(Math.random() * weapons.length)] });
+  }
+  return specs;
+}
+
+_startSearch(c){
+  this._searching = true;
+  this._searchTimer = 0;
+  this._searchTarget = c;
+  this._revealInterval = 0.5;
+
+  if (!c.loot) {
+    c.loot = this._generateLootSpecs();
+    c.revealed = [];
+    c.searched = false;
+  }
+  if (!c.revealed) c.revealed = [];
+
+  const panel = document.getElementById('search-panel');
+  if (panel) panel.classList.add('on');
+  this._renderSearchPanel();
+  this._log('开始搜索…', 'p');
+  this._playSFX('reload');
+}
+
+_revealOne(){
+  const c = this._searchTarget;
+  if (!c || !c.loot || c.loot.length === 0) return;
+  const spec = c.loot.shift();
+  c.revealed.push(spec);
+  if (c.loot.length === 0) c.searched = true;
+  this._renderSearchPanel();
+  this._playSFX('hit', { volume: 0.25 });
+}
+
+_renderSearchPanel(){
+  const c = this._searchTarget;
+  const body = document.getElementById('search-body');
+  const takeAllBtn = document.getElementById('search-take-all');
+  if (!body || !c) return;
+  const i18n = this.engine.i18n;
+
+  let html = '';
+  if (c.revealed.length === 0 && c.loot && c.loot.length > 0) {
+    html = '<div class="search-empty">搜索中…</div>';
+  } else if (c.revealed.length === 0) {
+    html = '<div class="search-empty">容器已空</div>';
+  } else {
+    for (let i = 0; i < c.revealed.length; i++) {
+      const spec = c.revealed[i];
+      const def = this.engine.content.get(spec.table, spec.defId);
+      const name = def ? i18n.t(def.name || def.n || spec.defId) : spec.defId;
+      const qty = spec.qty > 1 ? ' ×' + spec.qty : '';
+      html += `<div class="search-item">
+        <span class="search-item-name">${this._esc(name)}${qty}</span>
+        <button class="search-item-take" data-index="${i}">拾取</button>
+      </div>`;
+    }
+  }
+  body.innerHTML = html;
+
+  body.querySelectorAll('.search-item-take').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._takeLoot(parseInt(btn.dataset.index, 10));
+    });
+  });
+
+  if (takeAllBtn) {
+    takeAllBtn.disabled = c.revealed.length === 0;
+    takeAllBtn.onclick = () => this._takeAllLoot();
+  }
+  const closeBtn = document.getElementById('search-close');
+  if (closeBtn) closeBtn.onclick = () => this._closeSearch();
+}
+
+_takeLoot(index){
+  const c = this._searchTarget;
+  if (!c || !c.revealed[index]) return;
+  const inv = this.engine.app ? this.engine.app.inventory : null;
+  if (!inv) return;
+  const spec = c.revealed[index];
+  const uid = inv.createItem(spec.table, spec.defId, { qty: spec.qty || 1 });
+  if (!uid) return;
+  const r = inv.addToContainer('bag', uid);
+  if (!r.ok) {
+    inv.destroyItem(uid);
+    this._log('背包已满', 'y');
+    return;
+  }
+  c.revealed.splice(index, 1);
+  this._renderSearchPanel();
+}
+
+_takeAllLoot(){
+  const c = this._searchTarget;
+  if (!c) return;
+  const inv = this.engine.app ? this.engine.app.inventory : null;
+  if (!inv) return;
+  for (let i = c.revealed.length - 1; i >= 0; i--) {
+    const spec = c.revealed[i];
+    const uid = inv.createItem(spec.table, spec.defId, { qty: spec.qty || 1 });
+    if (!uid) continue;
+    const r = inv.addToContainer('bag', uid);
+    if (!r.ok) { inv.destroyItem(uid); this._log('背包已满', 'y'); break; }
+    c.revealed.splice(i, 1);
+  }
+  this._renderSearchPanel();
+}
+
+_closeSearch(){
+  this._searching = false;
+  this._searchTimer = 0;
+  const panel = document.getElementById('search-panel');
+  if (panel) panel.classList.remove('on');
+  this._searchTarget = null;
+}
+
+_updateSearchHint(){
+  const el = document.getElementById('search-hint');
+  if (!el) return;
+  if (this._searching) { el.classList.remove('on'); return; }
+  const c = this._searchTarget;
+  if (c && !(c.searched && c.revealed && c.revealed.length === 0)) {
+    el.classList.add('on');
+  } else {
+    el.classList.remove('on');
+  }
+}
+
+_updateMobileButtons(){
+  if (!this._mobileButtons) return;
+  const searchBtn = this._mobileButtons.search;
+  if (searchBtn) {
+    const c = this._searchTarget;
+    const show = c && !(c.searched && c.revealed && c.revealed.length === 0) && !this._searching;
+    searchBtn.style.display = show ? 'flex' : 'none';
+  }
+}
+   
+  _trySearchContainer(){
+  if (this._searching) return;
+  const c = this._searchTarget;
+  if (!c) { this._log('附近没有可搜索的容器', 'y'); return; }
+  if (c.searched && c.revealed && c.revealed.length === 0) {
+    this._log('容器已空', 'y');
+    return;
+  }
+  this._startSearch(c);
+}
 
   _generateLoot(){
   const inv = this.engine.app ? this.engine.app.inventory : null;
