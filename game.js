@@ -1413,17 +1413,29 @@ if (isPlayer) {
   muzzleOffset.applyQuaternion(cam.quaternion);
   const muzzlePos = camPos.clone().add(muzzleOffset);
 
-  for (let i = 0; i < pellets; i++) {
-    const spreadX = (Math.random() * 2 - 1) * spread;
-    const spreadY = (Math.random() * 2 - 1) * spread;
-    const dX = dir.x + spreadX;
-    const dY = dir.y + spreadY;
-    const dZ = dir.z + spreadX;
-    const len = Math.hypot(dX, dY, dZ) || 1;
-    
-    // 从枪口坐标出发，方向依然是准星方向
-    this._raycastBullet(owner, muzzlePos.x, muzzlePos.y, muzzlePos.z, dX/len, dY/len, dZ/len, baseEnergy, range, def, ammo, true);
-  }
+  // 构建相机方向的正交基（right / up），用于圆形散布采样
+const dLen = Math.hypot(dir.x, dir.y, dir.z) || 1;
+const nX = dir.x / dLen, nY = dir.y / dLen, nZ = dir.z / dLen;
+const xzLen = Math.hypot(nX, nZ) || 1e-6;
+const rightX = -nZ / xzLen, rightZ = nX / xzLen;
+const upX = -nX * nY / xzLen;
+const upY = xzLen;
+const upZ = -nZ * nY / xzLen;
+
+for (let i = 0; i < pellets; i++) {
+  // 圆盘均匀采样：角度均匀，半径按 sqrt 分布
+  const ang = Math.random() * Math.PI * 2;
+  const rad = Math.sqrt(Math.random()) * spread;
+  const sx = Math.cos(ang) * rad;
+  const sy = Math.sin(ang) * rad;
+
+  const dX = nX + rightX * sx + upX * sy;
+  const dY = nY + upY * sy;
+  const dZ = nZ + rightZ * sx + upZ * sy;
+  const len = Math.hypot(dX, dY, dZ) || 1;
+
+  this._raycastBullet(owner, muzzlePos.x, muzzlePos.y, muzzlePos.z, dX / len, dY / len, dZ / len, baseEnergy, range, def, ammo, true);
+}
 } else {
     // 敌人射击：从胸口高度出发
     const sy = owner.body.position.y + 1.2;
