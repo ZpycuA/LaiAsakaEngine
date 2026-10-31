@@ -1758,21 +1758,26 @@ _addKillFeed(name, dmg, dist) {
   }
 
   _updateContainers(dt){
-    if (!this._searching) {
-      const p = this.player;
-      if (!p || !p.alive) return;
-      let best = null, bestDist = COMBAT.SEARCH_RADIUS;
-      for (const c of this.containers) {
-        if (c.opened) continue;
-        const d = Math.hypot(p.body.position.x - c.x, p.body.position.z - c.z);
-        if (d < bestDist) { best = c; bestDist = d; }
-      }
-      this._searchTarget = best;
-    } else {
-      this._searchTimer += dt;
-      if (this._searchTimer >= COMBAT.SEARCH_TIME) this._finishSearch();
+  if (!this._searching) {
+    const p = this.player;
+    if (!p || !p.alive) { this._searchTarget = null; return; }
+    let best = null, bestDist = COMBAT.SEARCH_RADIUS;
+    for (const c of this.containers) {
+      if (c.searched && c.revealed && c.revealed.length === 0) continue;
+      const d = Math.hypot(p.body.position.x - c.x, p.body.position.z - c.z);
+      if (d < bestDist) { best = c; bestDist = d; }
+    }
+    this._searchTarget = best;
+  } else {
+    const c = this._searchTarget;
+    if (!c) { this._closeSearch(); return; }
+    this._searchTimer += dt;
+    if (this._searchTimer >= this._revealInterval && c.loot && c.loot.length > 0) {
+      this._searchTimer = 0;
+      this._revealOne();
     }
   }
+}
 
   _esc(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1993,44 +1998,6 @@ _updateMobileButtons(){
 
   return results;
   }
-   
-  _finishSearch(){
-  const c = this._searchTarget;
-  this._searching = false;
-  this._searchTimer = 0;
-  this._searchTarget = null;
-  if (!c) return;
-  c.opened = true;
-  if (c.mesh) {
-    c.mesh.material.emissive = new THREE.Color(0x000000);
-    c.mesh.material.color = new THREE.Color(0x3a3a3a);
-  }
-  this.combatLog.push({
-    type: 'search', t: this.time,
-    containerType: '物资容器',
-  });
-
-  const loot = this._generateLoot();
-  let totalValue = 0;
-  for (const l of loot) {
-    const val = 50 + Math.floor(Math.random() * 200);
-    totalValue += val;
-    this.combatLog.push({
-      type: 'loot', t: this.time,
-      name: l.name || '物资',
-      value: val,
-      qty: l.qty || 1,
-    });
-  }
-  this.player.carriedValue += totalValue;
-  this.tasks.progress('loot', 1);
-
-  if (loot.length === 0) {
-    this._log('搜索完成 · 背包已满，无法拾取', 'y');
-  } else {
-    this._log('搜索完成 · 拾取 ' + loot.length + ' 件物资（约 ' + totalValue + ' cp）', 'g');
-  }
-}
 
   _useSkill(slot){
     const p = this.player;
