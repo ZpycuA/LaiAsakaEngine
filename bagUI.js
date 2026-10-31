@@ -7,8 +7,7 @@
    ============================================================ */
 
 const CSS = `
-#bagui-overlay{position:fixed;inset:0;z-index:500;background:rgba(4,8,14,.94);display:none;flex-direction:column;font-family:-apple-system,"PingFang SC",sans-serif;color:#d8e2ee;padding:12px;touch-action:auto}
-#bagui-overlay.on{display:flex}
+#bagui-overlay{position:fixed;inset:0;z-index:500;background:rgba(4,8,14,.94);display:none;flex-direction:column;font-family:-apple-system,"PingFang SC",sans-serif;color:#d8e2ee;padding:12px;touch-action:auto;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}#bagui-overlay.on{display:flex}
 .bagui-wrap{display:flex;flex-direction:column;height:100%;max-width:1200px;margin:0 auto;width:100%}
 .bagui-header{display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:1px solid rgba(105,170,235,.3)}
 .bagui-header h2{font-size:16px;letter-spacing:4px;color:#a8d8ff}
@@ -151,7 +150,8 @@ close() {
     const item = inv.items.get(uid);
     if (!item) return `<div class="bagui-slot empty" ${srcAttrs}></div>`;
     const def = inv.getDef(item);
-    const name = def ? (def.name || def.n || def.id || '?') : '?';
+const rawName = def ? (def.name || def.n || def.id || '?') : '?';
+const name = this.engine.i18n.t(rawName);
     const qty = item.qty > 1 ? `<span class="bagui-qty">×${item.qty}</span>` : '';
     const dur = item.durMax > 0 ? Math.round(item.dur / item.durMax * 100) : -1;
     const durBar = dur >= 0 ? `<div class="bagui-dur"><i style="width:${dur}%;background:${dur > 60 ? '#6fe07a' : dur > 30 ? '#ffd93d' : '#ff5a5a'}"></i></div>` : '';
@@ -187,7 +187,9 @@ close() {
     const item = this.inv.items.get(uid);
     const def = this.inv.getDef(item);
     if (!def) { el.innerHTML = '<div class="bagui-empty">未知物品</div>'; return; }
-    let html = `<div class="bagui-detail-title">${this._esc(def.name || def.n || '?')}</div>`;
+    const rawDetailName = def.name || def.n || '?';
+const displayDetailName = this.engine.i18n.t(rawDetailName);
+let html = `<div class="bagui-detail-title">${this._esc(displayDetailName)}</div>`;
     if (item.qty > 1) html += `<div>数量：${item.qty}</div>`;
     if (item.durMax > 0) html += `<div>耐久：${Math.round(item.dur)}/${item.durMax}（${Math.round(item.dur / item.durMax * 100)}%）</div>`;
     if (def.rpm) html += `<div>射速 ${def.rpm} RPM · 弹匣 ${def.mag || '—'}</div>`;
@@ -199,9 +201,11 @@ close() {
         html += `<div class="bagui-attach-slot" data-weapon-uid="${uid}" data-attach-slot="${slot}">`;
         html += `<span class="bagui-attach-label">${slot}</span>`;
         if (aUid) {
-          const aDef = this.inv.getDef(this.inv.items.get(aUid));
-          html += `<span class="bagui-attach-val">${this._esc(aDef ? (aDef.name || aDef.n) : '?')}</span>`;
-        } else html += '<span class="bagui-attach-empty">空</span>';
+  const aDef = this.inv.getDef(this.inv.items.get(aUid));
+  const aRawName = aDef ? (aDef.name || aDef.n || '?') : '?';
+  const aDisplayName = this.engine.i18n.t(aRawName);
+  html += `<span class="bagui-attach-val">${this._esc(aDisplayName)}</span>`;
+} else html += '<span class="bagui-attach-empty">空</span>';
         html += '</div>';
       }
       html += '</div>';
