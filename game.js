@@ -1109,7 +1109,7 @@ _buildArmorFromInventory(inv) {
     mesh.position.x = cx;
     mesh.position.z = cz;
     this.engine.renderer.scene.add(mesh);
-    this.containers.push({ x: cx, z: cz, mesh, opened: false });
+    this.containers.push({ x: cx, z: cz, mesh, opened: false, loot: null, revealed: [], searched: false });
     
     // ★ 将容器加入小地图兴趣点
     this.pois.push({ x: cx, z: cz, type: 'container', color: '#ffcc33' });
@@ -1135,6 +1135,8 @@ _buildArmorFromInventory(inv) {
   this._updateExtracts(dt);
   this._updateContainers(dt);
   this._updateTracers(dt);
+  this._updateMobileButtons();
+  this._updateSearchHint();
 
   this.physics.step(dt);
   this._syncMeshes();
@@ -1205,18 +1207,20 @@ _updatePlayer(dt){
   const baseSpeed = p.charSpec.speed * (p.speedMul !== undefined ? p.speedMul : 1);
   const speed = isSprinting ? baseSpeed * 1.8 : baseSpeed; // 冲刺速度加成
 
-  // ★ 3. 移动计算（基于相机朝向的 3D 移动）
+  // ★ 3. 移动计算（搜索时锁定移动）
+let moveX = 0, moveZ = 0;
+if (!this._searching) {
   const forwardX = Math.sin(e.cameraCtl.yaw);
   const forwardZ = -Math.cos(e.cameraCtl.yaw);
   const rightX = Math.cos(e.cameraCtl.yaw);
   const rightZ = Math.sin(e.cameraCtl.yaw);
+  moveX = rightX * mv.x + forwardX * -mv.z;
+  moveZ = rightZ * mv.x + forwardZ * -mv.z;
+}
 
-  let moveX = rightX * mv.x + forwardX * -mv.z;
-  let moveZ = rightZ * mv.x + forwardZ * -mv.z;
-
-  p.body.velocity.x = moveX * speed;
-  p.body.velocity.z = moveZ * speed;
-  if (isMoving) p.body.wake();
+p.body.velocity.x = moveX * speed;
+p.body.velocity.z = moveZ * speed;
+if (isMoving && !this._searching) p.body.wake();
 
   // ★ 4. 跳跃检测
   const jumpPressed = e.input.keys.has(' ') || e.input.isActive('jump');
@@ -1241,22 +1245,24 @@ _updatePlayer(dt){
 
   // ★ 6. 换弹与开火逻辑
   if (p.reloading > 0) {
-    p.reloading -= dt;
-    if (p.reloading <= 0) this._finishReload();
-  } else {
-    if (p.fireCd > 0) p.fireCd -= dt;
-    if (e.input.isActive('fire') && p.fireCd <= 0 && p.weapon) {
-      if (p.weapon.mag <= 0) this._startReload();
-      else this._fireWeapon(p, p.weapon, true);
-    }
+  p.reloading -= dt;
+  if (p.reloading <= 0) this._finishReload();
+} else if (!this._searching) {
+  if (p.fireCd > 0) p.fireCd -= dt;
+  if (e.input.isActive('fire') && p.fireCd <= 0 && p.weapon) {
+    if (p.weapon.mag <= 0) this._startReload();
+    else this._fireWeapon(p, p.weapon, true);
   }
+}
 
-  // ★ 7. 其他输入动作检测
+// ★ 7. 其他输入动作检测（搜索时禁用）
+if (!this._searching) {
   if (e.input.isActive('reload')) this._startReload();
   if (e.input.isActive('switchWeapon') && p.sidearm) this._switchWeapon();
   if (e.input.isActive('skill1')) this._useSkill(0);
   if (e.input.isActive('skill2')) this._useSkill(1);
   if (e.input.isActive('search')) this._trySearchContainer();
+}
 
   // 边界限制，防止跑出地图
   const half = this.mapSpec.size / 2 - 1;
@@ -1664,7 +1670,12 @@ _damagePlayer(player, energy, pen, isHead = false, srcX, srcZ, sourceEnt = null)
   this.engine.cameraCtl.shake(0.4, 0.15);
   this._playSFX('hurt', { volume: 0.5 });
 
-  if (player.hp <= 0 && player.alive) this._playerDown();
+ if (this._searching) {
+  this._closeSearch();
+  this._log('搜索被打断', 'r');
+}
+
+if (player.hp <= 0 && player.alive) this._playerDown();
 }
 
  _killEnemy(enemy, dmg, dist){
