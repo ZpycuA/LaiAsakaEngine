@@ -41,9 +41,10 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
 .boot-status{font-size:10.5px;color:var(--dim);letter-spacing:2px;font-family:var(--mono);min-height:16px}
 .boot-copyright{font-size:10px;color:var(--dim2);letter-spacing:1px;line-height:1.9;font-family:var(--mono)}
 .boot-copyright b{color:var(--accent)}
-#boot-error{max-width:520px;text-align:left;font-family:var(--mono);font-size:11px;line-height:1.7;color:#ff8b8b;padding:14px;border:1px solid rgba(255,100,100,.35);border-radius:8px;background:rgba(80,20,20,.35);display:none;white-space:pre-wrap;word-break:break-word}
+#boot-error{max-width:min(92vw,780px);text-align:left;font-family:var(--mono);font-size:11px;line-height:1.7;color:#ff8b8b;padding:14px;border:1px solid rgba(255,100,100,.35);border-radius:8px;background:rgba(80,20,20,.35);display:none;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text}
 #boot-error.on{display:block}
 #boot-error b{color:var(--gold)}
+#boot-error pre,#boot-error pre *{user-select:text;-webkit-user-select:text;cursor:text}
 
 /* ---------- Menu ---------- */
 #menu-screen{background:radial-gradient(circle at 50% 20%,#0f1a28 0%,#05070a 78%);overflow-y:auto;z-index:50;align-items:stretch;justify-content:flex-start}
@@ -605,50 +606,193 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
   const errorEl = document.getElementById('boot-error');
   const barEl = document.getElementById('boot-bar');
 
+  const bootTrace = [];
+  let currentStep = '启动';
+  let currentFile = 'index.html';
+
+  function markStep(name, file) {
+    currentStep = name;
+    if (file) currentFile = file;
+    bootTrace.push(name);
+  }
+
   function setStatus(text, pct) {
     if (statusEl) statusEl.textContent = text;
     if (barEl && pct !== undefined) barEl.style.width = pct + '%';
   }
 
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  /* 从 stack 中提取所有 "file.js:行:列" 形式的定位 */
+  function extractLocations(stack) {
+    if (!stack) return [];
+    const results = [];
+    const seen = new Set();
+    for (const line of String(stack).split('\n')) {
+      const m = line.match(/([^\s()]+\.js(?:\?[^\s():]+)?):(\d+)(?::(\d+))?/);
+      if (m) {
+        const key = m[1] + ':' + m[2];
+        if (seen.has(key)) continue;
+        seen.add(key);
+        results.push({
+          file: m[1].replace(/^.*\//, '').replace(/\?.*$/, ''),
+          fullFile: m[1],
+          line: m[2],
+          col: m[3] || '',
+        });
+      }
+    }
+    return results;
+  }
+
+  function formatError(title, err) {
+    const lines = [];
+    lines.push('⚠ ' + title);
+    lines.push('');
+    lines.push('▸ 出错步骤：' + currentStep);
+    lines.push('▸ 涉及文件：' + currentFile);
+    lines.push('▸ 错误类型：' + (err && err.name ? err.name : 'Error'));
+    lines.push('▸ 错误信息：' + (err && err.message ? err.message : String(err)));
+
+    const locations = extractLocations(err && err.stack);
+    if (locations.length) {
+      const primary = locations[0];
+      lines.push('▸ 出错位置：' + primary.file + ':' + primary.line + (primary.col ? ':' + primary.col : ''));
+    } else {
+      lines.push('▸ 出错位置：（堆栈中无文件行号信息）');
+    }
+
+    if (err && err.name === 'SyntaxError') {
+      const file = locations[0] ? locations[0].file : (currentFile || 'game.js');
+      lines.push('▸ 提示：语法错误。运行 node --check ' + file + ' 可精确定位行号。');
+    }
+    if (err && err.message && /dynamically imported module|Cannot find module|Failed to fetch/i.test(err.message)) {
+      lines.push('▸ 提示：模块加载失败——文件不存在、路径写错，或被 import 的文件内部有语法错误（语法错误会导致整个模块加载失败）。');
+      const m = err.message.match(/(https?:\/\/\S+?\.js[^\s)]*)/);
+      if (m) lines.push('       失败 URL：' + m[1]);
+      lines.push('       请检查 Network 面板里该 .js 返回 404 还是 200。返回 200 就是文件本身语法错误。');
+    }
+
+    lines.push('');
+    lines.push('▸ 步骤历史：');
+    for (let i = 0; i < bootTrace.length; i++) {
+      const prefix = (i === bootTrace.length - 1) ? '  ▶ ' : '    ';
+      lines.push(prefix + bootTrace[i]);
+    }
+
+    if (locations.length > 1) {
+      lines.push('');
+      lines.push('▸ 堆栈中所有定位：');
+      for (const loc of locations) {
+        lines.push('    ' + loc.file + ':' + loc.line + (loc.col ? ':' + loc.col : ''));
+      }
+    }
+
+    lines.push('');
+    lines.push('▸ 原始堆栈：');
+    lines.push((err && err.stack) ? err.stack : '（无堆栈信息）');
+
+    return lines.join('\n');
+  }
+
+  function fallbackCopy(text, done) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (done) done();
+    } catch (e) { console.warn('复制失败:', e); }
+  }
+
   function showError(title, err) {
-    if (!errorEl) return;
-    errorEl.classList.add('on');
-    errorEl.innerHTML =
-      '<b>' + title + '</b>\n\n' +
-      '缺失或损坏的依赖文件。请确认同目录下存在以下文件：\n' +
-      '  engine.js\n' +
-      '  content.js\n' +
-      '  modes.js\n' +
-      '  game.js\n' +
-      '  locale.zh-CN.js\n' +
-      '  locale.en-US.js\n\n' +
-      '错误详情：\n' + (err && err.message ? err.message : String(err));
+    const text = formatError(title, err);
+
+    if (errorEl) {
+      errorEl.classList.add('on');
+      errorEl.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">' +
+          '<b style="color:#ff8b8b">' + escapeHtml(title) + '</b>' +
+          '<button id="boot-error-copy" style="padding:4px 12px;background:rgba(60,100,150,.6);border:1px solid rgba(110,180,255,.5);color:#cfe8ff;border-radius:4px;font-size:11px;cursor:pointer;font-family:inherit;user-select:none">复制全部</button>' +
+        '</div>' +
+        '<pre id="boot-error-text" style="user-select:text;-webkit-user-select:text;white-space:pre-wrap;word-break:break-word;margin:0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.7;color:#ffb0b0;max-height:60vh;overflow-y:auto">' +
+          escapeHtml(text) +
+        '</pre>';
+
+      const copyBtn = document.getElementById('boot-error-copy');
+      const textEl = document.getElementById('boot-error-text');
+      if (copyBtn && textEl) {
+        copyBtn.addEventListener('click', () => {
+          const content = textEl.textContent;
+          const done = () => {
+            copyBtn.textContent = '✓ 已复制';
+            setTimeout(() => { copyBtn.textContent = '复制全部'; }, 1500);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(content).then(done).catch(() => fallbackCopy(content, done));
+          } else {
+            fallbackCopy(content, done);
+          }
+        });
+      }
+    }
+
     if (statusEl) {
-      statusEl.textContent = '⚠ 加载失败';
+      statusEl.textContent = '⚠ ' + title;
       statusEl.style.color = '#ff8b8b';
     }
     if (barEl) barEl.style.background = 'linear-gradient(90deg,#ff5b5b,#ff9a6a)';
-    console.error('[LaiAsaka] Boot failed:', err);
+
+    console.error('[LaiAsaka] Boot failed @ ' + currentStep + ':\n' + text);
   }
+
+  /* 兜底：捕获 boot 之后才发生的运行时错误 */
+  window.addEventListener('error', (ev) => {
+    if (!errorEl || errorEl.classList.contains('on')) return;
+    if (!ev.filename) return;
+    const fakeErr = new Error(ev.message || 'Script error');
+    fakeErr.stack = ev.filename + ':' + (ev.lineno || '?') + ':' + (ev.colno || '?')
+      + '\n' + (ev.error && ev.error.stack ? ev.error.stack : '');
+    showError('运行时错误', fakeErr);
+  });
+  window.addEventListener('unhandledrejection', (ev) => {
+    if (!errorEl || errorEl.classList.contains('on')) return;
+    const reason = ev.reason instanceof Error ? ev.reason : new Error(String(ev.reason));
+    showError('未处理的 Promise 拒绝', reason);
+  });
 
   (async function boot() {
     try {
+      markStep('加载 engine.js', 'engine.js');
       setStatus('正在加载引擎核心…', 10);
       const { Engine } = await import('./engine.js');
 
+      markStep('加载 locale.zh-CN.js', 'locale.zh-CN.js');
       setStatus('正在加载语言包…', 25);
       const zhCN = (await import('./locale.zh-CN.js')).default;
+
+      markStep('加载 locale.en-US.js', 'locale.en-US.js');
       const enUS = (await import('./locale.en-US.js')).default;
 
+      markStep('加载 content.js', 'content.js');
       setStatus('正在加载内容表…', 40);
       const { registerDefaultContent } = await import('./content.js');
 
+      markStep('加载 modes.js', 'modes.js');
       setStatus('正在加载模式…', 55);
       const { registerModes } = await import('./modes.js');
 
+      markStep('加载 game.js', 'game.js');
       setStatus('正在加载应用层…', 70);
       const { GameApp } = await import('./game.js');
 
+      markStep('初始化引擎', 'engine.js');
       setStatus('正在初始化引擎…', 85);
       const engine = new Engine();
       await engine.init({
@@ -657,20 +801,20 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
         defaultLocale: 'zh-CN',
       });
 
-      // 注册内容
+      markStep('注册内容', 'content.js');
       registerDefaultContent(engine);
 
-      // 注册模式（straight / asaka 接口）
+      markStep('注册模式', 'modes.js');
       registerModes(engine);
 
-      // 应用层
+      markStep('初始化应用层', 'game.js');
       const app = new GameApp(engine);
       engine.app = app;
-      
-      // ★ 核心修复：在此处直接绑定入口按钮，绕过 game.js 的潜在错误
+
+      markStep('绑定入口按钮', 'index.html');
       const btnStart = document.getElementById('btn-start');
       const btnTrain = document.getElementById('btn-train');
-      
+
       if (btnStart) {
         btnStart.onclick = (e) => {
           e.preventDefault();
@@ -682,7 +826,7 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
           }
         };
       }
-      
+
       if (btnTrain) {
         btnTrain.onclick = (e) => {
           e.preventDefault();
@@ -695,7 +839,7 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
         };
       }
 
-      // 初始化菜单渲染
+      markStep('渲染菜单', 'game.js');
       app.boot();
 
       setStatus('就绪', 100);
@@ -707,7 +851,7 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
         engine.start();
       }, 300);
 
-      /* ---- 语言切换 ---- */
+      markStep('绑定语言切换', 'index.html');
       const langSelector = document.getElementById('lang-selector');
       if (langSelector) {
         langSelector.addEventListener('click', (ev) => {
@@ -723,7 +867,7 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
         });
       }
 
-      /* ---- DEV 按钮 ---- */
+      markStep('绑定 DEV 按钮', 'index.html');
       const devBtn = document.getElementById('btn-dev-console');
       if (devBtn) {
         devBtn.addEventListener('click', () => {
@@ -731,8 +875,7 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
         });
       }
     } catch (err) {
-      showError('启动失败：无法加载依赖文件', err);
-      alert('启动崩溃：\n' + (err.stack || err.message || String(err)));
+      showError('启动失败 @ ' + currentStep, err);
     }
   })();
 })();
