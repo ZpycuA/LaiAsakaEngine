@@ -133,8 +133,41 @@ export class Inventory {
   }
 
   getContainer(name) {
-    return this.containers[name] || null;
+  return this.containers[name] || null;
+}
+
+getItemValue(itemOrUid) {
+  const item = typeof itemOrUid === 'string' ? this.items.get(itemOrUid) : itemOrUid;
+  if (!item) return 0;
+  const def = this.getDef(item);
+  if (!def) return 0;
+  let unit = def.value || 0;
+  if (item.durMax > 0 && item.dur !== undefined) {
+    const ratio = Math.max(0, Math.min(1, item.dur / item.durMax));
+    unit = Math.round(unit * (0.3 + 0.7 * ratio));
   }
+  return unit * (item.qty || 1);
+}
+
+getContainerValue(name) {
+  const c = this.containers[name];
+  if (!c) return 0;
+  let total = 0;
+  for (const uid of c.uids) total += this.getItemValue(uid);
+  return total;
+}
+
+getTotalValue() {
+  let total = 0;
+  for (const slot in this.equipped) {
+    const uid = this.equipped[slot];
+    if (uid) total += this.getItemValue(uid);
+  }
+  for (const name of CONTAINER_NAMES) {
+    total += this.getContainerValue(name);
+  }
+  return total;
+}
 
   /* ====================== 容器操作 ====================== */
   addToContainer(name, uid) {
