@@ -533,7 +533,23 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
   <div class="overlay" id="result-screen">
   <h2 id="result-title">—</h2>
   <div class="stat" id="result-stats"></div>
-  
+
+  <!-- 搜索面板 -->
+<div id="search-panel">
+  <div class="search-box">
+    <div class="search-header">
+      <span>物资容器</span>
+      <button id="search-close">✕</button>
+    </div>
+    <div class="search-body" id="search-body">
+      <div class="search-empty">搜索中…</div>
+    </div>
+    <div class="search-footer">
+      <button id="search-take-all" disabled>全部拾取</button>
+    </div>
+  </div>
+</div>
+     
   <!-- 伤害日志（死亡回放） -->
   <div id="damage-log-container" style="display:none; width:100%; max-width:600px; max-height:40vh; overflow-y:auto; margin-bottom:16px; background:rgba(0,0,0,0.5); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); text-align:left; font-size:12px;">
     <div style="color:var(--accent); margin-bottom:8px; font-weight:bold;">交战记录 (最近 50 条)</div>
