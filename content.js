@@ -37,11 +37,11 @@ export function registerDefaultContent(engine) {
    ⚠ 这两者独立：tier 高不代表穿透高，反之亦然
    ========================================================== */
 const AMMO = {
-  '9mm':    { name: 'content.ammo.9mm.name',    massG: 8.0,  v0: 360, tier: 0, pen: 0 },
-  '5.56':   { name: 'content.ammo.556.name',    massG: 4.0,  v0: 940, tier: 2, pen: 3 },
-  '7.62':   { name: 'content.ammo.762.name',    massG: 8.0,  v0: 730, tier: 2, pen: 5 },
-  '.45acp': { name: 'content.ammo.45acp.name',  massG: 14.9, v0: 290, tier: 0, pen: 1 },
-  '12ga':   { name: 'content.ammo.12ga.name',   massG: 3.5,  v0: 410, tier: 0, pen: 0 },
+  '9mm':    { name: 'content.ammo.9mm.name',    massG: 8.0,  v0: 360, tier: 0, pen: 0, value: 15 },
+  '5.56':   { name: 'content.ammo.556.name',    massG: 4.0,  v0: 940, tier: 2, pen: 3, value: 60 },
+  '7.62':   { name: 'content.ammo.762.name',    massG: 8.0,  v0: 730, tier: 2, pen: 5, value: 80 },
+  '.45acp': { name: 'content.ammo.45acp.name',  massG: 14.9, v0: 290, tier: 0, pen: 1, value: 25 },
+  '12ga':   { name: 'content.ammo.12ga.name',   massG: 3.5,  v0: 410, tier: 0, pen: 0, value: 40 },
 };
   c.registerAll('ammo', AMMO);
 
@@ -58,12 +58,12 @@ const AMMO = {
      pellets:   每次射击弹丸数（霰弹 > 1）
      ========================================================== */
   const WEAPONS = {
-  p9:    { name: 'content.weapon.p9.name',    ammoType: '9mm',    rpm: 420, mag: 15, reload: 1.5, range: 80,  spread: 0.032, auto: false, pellets: 1, color: 0x6a6a7a },
-  smg45: { name: 'content.weapon.smg45.name', ammoType: '.45acp', rpm: 780, mag: 25, reload: 2.0, range: 60,  spread: 0.048, auto: true,  pellets: 1, color: 0x4a4a5a },
-  ar556: { name: 'content.weapon.ar556.name', ammoType: '5.56',   rpm: 700, mag: 30, reload: 2.3, range: 140, spread: 0.025, auto: true,  pellets: 1, color: 0x3a4a5a },
-  ak762: { name: 'content.weapon.ak762.name', ammoType: '7.62',   rpm: 620, mag: 30, reload: 2.6, range: 130, spread: 0.034, auto: true,  pellets: 1, color: 0x5a3a2a },
-  sr762: { name: 'content.weapon.sr762.name', ammoType: '7.62',   rpm: 55,  mag: 5,  reload: 3.2, range: 250, spread: 0.002, auto: false, pellets: 1, color: 0x2a3a4a },
-  sg12:  { name: 'content.weapon.sg12.name',  ammoType: '12ga',   rpm: 85,  mag: 6,  reload: 3.0, range: 35,  spread: 0.100, auto: false, pellets: 9, color: 0x5a4a2a },
+  p9:    { name: 'content.weapon.p9.name',    ammoType: '9mm',    rpm: 420, mag: 15, reload: 1.5, range: 80,  spread: 0.032, auto: false, pellets: 1, color: 0x6a6a7a, value: 600 },
+  smg45: { name: 'content.weapon.smg45.name', ammoType: '.45acp', rpm: 780, mag: 25, reload: 2.0, range: 60,  spread: 0.048, auto: true,  pellets: 1, color: 0x4a4a5a, value: 1500 },
+  ar556: { name: 'content.weapon.ar556.name', ammoType: '5.56',   rpm: 700, mag: 30, reload: 2.3, range: 140, spread: 0.025, auto: true,  pellets: 1, color: 0x3a4a5a, value: 3000 },
+  ak762: { name: 'content.weapon.ak762.name', ammoType: '7.62',   rpm: 620, mag: 30, reload: 2.6, range: 130, spread: 0.034, auto: true,  pellets: 1, color: 0x5a3a2a, value: 3200 },
+  sr762: { name: 'content.weapon.sr762.name', ammoType: '7.62',   rpm: 55,  mag: 5,  reload: 3.2, range: 250, spread: 0.002, auto: false, pellets: 1, color: 0x2a3a4a, value: 8000 },
+  sg12:  { name: 'content.weapon.sg12.name',  ammoType: '12ga',   rpm: 85,  mag: 6,  reload: 3.0, range: 35,  spread: 0.100, auto: false, pellets: 9, color: 0x5a4a2a, value: 2500 },
 };
   c.registerAll('weapons', WEAPONS);
 
@@ -91,44 +91,44 @@ const AMMO = {
    cap:      容器容量（仅背包/胸挂）
    ========================================================== */
 const HELMET_SHELL = {
-  lv3: { name: 'content.helmetShell.lv3.name', armorLv: 3, maxDur: 100 },
-  lv4: { name: 'content.helmetShell.lv4.name', armorLv: 4, maxDur: 100 },
+  lv3: { name: 'content.helmetShell.lv3.name', armorLv: 3, maxDur: 100, value: 800 },
+  lv4: { name: 'content.helmetShell.lv4.name', armorLv: 4, maxDur: 100, value: 1500 },
 };
 c.registerAll('helmetShell', HELMET_SHELL);
 
 const HELMET_VISOR = {
-  lv3: { name: 'content.helmetVisor.lv3.name', armorLv: 3, maxDur: 100 },
-  lv4: { name: 'content.helmetVisor.lv4.name', armorLv: 4, maxDur: 100 },
+  lv3: { name: 'content.helmetVisor.lv3.name', armorLv: 3, maxDur: 100, value: 600 },
+  lv4: { name: 'content.helmetVisor.lv4.name', armorLv: 4, maxDur: 100, value: 1200 },
 };
 c.registerAll('helmetVisor', HELMET_VISOR);
 
 const HELMET_EAR = {
-  basic: { name: 'content.helmetEar.basic.name', maxDur: 100 },
+  basic: { name: 'content.helmetEar.basic.name', maxDur: 100, value: 400 },
 };
 c.registerAll('helmetEar', HELMET_EAR);
 
 const VEST_FIBER = {
-  lv3: { name: 'content.vestFiber.lv3.name', armorLv: 3, maxDur: 100 },
-  lv4: { name: 'content.vestFiber.lv4.name', armorLv: 4, maxDur: 100 },
+  lv3: { name: 'content.vestFiber.lv3.name', armorLv: 3, maxDur: 100, value: 900 },
+  lv4: { name: 'content.vestFiber.lv4.name', armorLv: 4, maxDur: 100, value: 1600 },
 };
 c.registerAll('vestFiber', VEST_FIBER);
 
 const VEST_PLATE = {
-  lv4: { name: 'content.vestPlate.lv4.name', armorLv: 4, maxDur: 100 },
-  lv5: { name: 'content.vestPlate.lv5.name', armorLv: 5, maxDur: 100 },
+  lv4: { name: 'content.vestPlate.lv4.name', armorLv: 4, maxDur: 100, value: 1200 },
+  lv5: { name: 'content.vestPlate.lv5.name', armorLv: 5, maxDur: 100, value: 2400 },
 };
 c.registerAll('vestPlate', VEST_PLATE);
 
 const BACKPACK = {
-  small: { name: 'content.backpack.small.name', cap: 8 },
-  medium: { name: 'content.backpack.medium.name', cap: 16 },
-  large: { name: 'content.backpack.large.name', cap: 24 },
+  small: { name: 'content.backpack.small.name', cap: 8, value: 300 },
+  medium: { name: 'content.backpack.medium.name', cap: 16, value: 800 },
+  large: { name: 'content.backpack.large.name', cap: 24, value: 1800 },
 };
 c.registerAll('backpack', BACKPACK);
 
 const CHEST_RIG = {
-  small: { name: 'content.chestRig.small.name', cap: 4 },
-  large: { name: 'content.chestRig.large.name', cap: 6 },
+  small: { name: 'content.chestRig.small.name', cap: 4, value: 400 },
+  large: { name: 'content.chestRig.large.name', cap: 6, value: 900 },
 };
 c.registerAll('chestRig', CHEST_RIG);
 
