@@ -2384,19 +2384,21 @@ _syncMeshes(){
     catch (e) { console.error('[Mode] teardown:', e); }
   }
   if (this.onEnd) {
-    try {
-      this.onEnd(success, {
-        kills: this.player.kills,
-        accuracy: this.stats.shots > 0 ? Math.round(this.stats.hits / this.stats.shots * 100) : 0,
-        dealt: Math.round(this.player.dealt),
-        taken: Math.round(this.player.taken),
-        time: Math.round(this.time),
-        carriedValue: this.player.carriedValue,
-      });
-    } catch (e) {
-      console.error('[World._end] onEnd 回调异常：', e);
-    }
+  try {
+    const lootValue = this._computeLootValue();
+    this.player.carriedValue = lootValue;
+    this.onEnd(success, {
+      kills: this.player.kills,
+      accuracy: this.stats.shots > 0 ? Math.round(this.stats.hits / this.stats.shots * 100) : 0,
+      dealt: Math.round(this.player.dealt),
+      taken: Math.round(this.player.taken),
+      time: Math.round(this.time),
+      carriedValue: lootValue,
+    });
+  } catch (e) {
+    console.error('[World._end] onEnd 回调异常：', e);
   }
+}
 }
 
   destroy(){
