@@ -80,14 +80,21 @@ export class BagUI {
       </div>`;
     document.body.appendChild(overlay);
     document.getElementById('bagui-close').addEventListener('click', () => this.close());
-    window.addEventListener('pointermove', (e) => this._onMove(e));
-    window.addEventListener('pointerup', (e) => this._onUp(e));
+window.addEventListener('pointermove', (e) => this._onMove(e));
+window.addEventListener('pointerup', (e) => this._onUp(e));
+window.addEventListener('pointercancel', () => { this._cancelDrag(); this._clearGhosts(); });
+document.addEventListener('contextmenu', (e) => {
+  if (this.open && e.target && e.target.closest && e.target.closest('#bagui-overlay')) {
+    e.preventDefault();
+  }
+});
   }
 
 toggle() { this.open ? this.close() : this.show(); }
 show() {
   if (document.pointerLockElement) document.exitPointerLock();
   this.open = true;
+  this._clearGhosts();
   document.getElementById('bagui-overlay').classList.add('on');
   this.refresh();
 }
@@ -95,6 +102,7 @@ close() {
   this.open = false;
   document.getElementById('bagui-overlay').classList.remove('on');
   this._cancelDrag();
+  this._clearGhosts();
 }
 
   refresh() {
@@ -131,15 +139,22 @@ close() {
   }
 
   _renderRight() {
-    const el = document.getElementById('bagui-right');
-    const c = this.inv.containers.stash;
-    let html = `<div class="bagui-sec"><h3>仓库<span class="bagui-cap">${c.uids.length}/${c.cap}</span></h3><div class="bagui-grid">`;
-    for (const uid of c.uids) html += this._slotHtml(uid, { type: 'container', name: 'stash' });
-    for (let i = c.uids.length; i < Math.min(c.cap, c.uids.length + 20); i++) html += `<div class="bagui-slot empty" data-src-type="container" data-src-name="stash"></div>`;
-    html += '</div></div>';
-    el.innerHTML = html;
-    this._bindSlotEvents(el);
+  const el = document.getElementById('bagui-right');
+  if (!el) return;
+  const isInMatch = this.engine.app && this.engine.app.world && this.engine.app.world.running;
+  if (isInMatch) {
+    el.style.display = 'none';
+    return;
   }
+  el.style.display = '';
+  const c = this.inv.containers.stash;
+  let html = `<div class="bagui-sec"><h3>仓库<span class="bagui-cap">${c.uids.length}/${c.cap}</span></h3><div class="bagui-grid">`;
+  for (const uid of c.uids) html += this._slotHtml(uid, { type: 'container', name: 'stash' });
+  for (let i = c.uids.length; i < Math.min(c.cap, c.uids.length + 20); i++) html += `<div class="bagui-slot empty" data-src-type="container" data-src-name="stash"></div>`;
+  html += '</div></div>';
+  el.innerHTML = html;
+  this._bindSlotEvents(el);
+}
 
   _slotHtml(uid, src, hint) {
     const inv = this.inv;
@@ -163,11 +178,14 @@ const name = this.engine.i18n.t(rawName);
   }
 
   _icon(item) {
-    if (!item) return '?';
-    return { weapons: '🔫', ammo: '🔸', cons: '💊', nade: '💣', attach: '⚙', valuable: '💎',
-      helmetShell: '⛑', helmetVisor: '🕶', helmetEar: '🎧', vestFiber: '🦺', vestPlate: '🛡',
-      backpack: '🎒', chestRig: '🧥' }[item.table] || '?';
+  if (!item) return '?';
+  const def = this.inv.getDef(item);
+  const icon = (def && def.icon) || { weapons: '🔫', ammo: '🔸', ... }[item.table] || '?';
+  if (icon.startsWith('/') || icon.startsWith('http')) {
+    return `<img src="${this._esc(icon)}" style="width:100%;height:100%;object-fit:contain" alt="">`;
   }
+  return icon;
+}
 
   _cname(n) { return { chest: '胸挂', pocket: '口袋', bag: '背包', safe: '安全箱', stash: '仓库' }[n] || n; }
   _esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
@@ -267,6 +285,10 @@ let html = `<div class="bagui-detail-title">${this._esc(displayDetailName)}</div
     if (!slotEl) { if (srcEl) srcEl.style.opacity = 1; return; }
     this._handleDrop(uid, slotEl);
   }
+
+   _clearGhosts() {
+  document.querySelectorAll('.bagui-ghost').forEach(g => { try { g.remove(); } catch (_) {} });
+   }
 
   _cancelDrag() {
     if (this._drag && this._drag.ghost) this._drag.ghost.remove();
