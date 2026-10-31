@@ -2341,8 +2341,11 @@ _syncMeshes(){
 }
 
   destroy(){
-    this.running = false;
-    if (this.player && this.player.weaponGroup) {
+  this.running = false;
+  if (this._searching) this._closeSearch();
+  const _sp = document.getElementById('search-panel');
+  if (_sp) _sp.classList.remove('on');
+  if (this.player && this.player.weaponGroup) {
       this.engine.renderer.camera.remove(this.player.weaponGroup);
     }
     for (const t of this.tracers) {
@@ -3054,9 +3057,13 @@ save.save();
     }
   }
   const mob = document.getElementById('mobile-controls');
-  if (mob) mob.style.display = 'none';
+if (mob) {
+  mob.style.display = 'none';
+  mob.innerHTML = '';
+}
+this._mobileButtons = null;
 
-  this._showScreen('menu');
+this._showScreen('menu');
   if (this.engine.save.refreshMenu) this.engine.save.refreshMenu();
 }
 
