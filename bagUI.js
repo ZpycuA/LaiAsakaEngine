@@ -40,6 +40,11 @@ const CSS = `
 .bagui-attach-empty{color:#4a6d8e}
 .bagui-attach-slot.drop-hint{box-shadow:0 0 0 2px #7bf5a8 inset}
 .bagui-empty{color:#5c82a8;text-align:center;padding:20px}
+.bagui-val{position:absolute;top:1px;left:3px;font-size:8px;color:#a8d8ff;font-weight:600;text-shadow:0 1px 2px #000}
+.bagui-total{font-size:10px;color:#ffd93d;letter-spacing:1px;font-weight:700}
+.bagui-toolbar{display:flex;gap:6px;margin-top:8px;padding:6px;background:rgba(10,18,28,.5);border-radius:6px;align-items:center;justify-content:space-between}
+.bagui-toolbar button{padding:5px 12px;font-size:11px;cursor:pointer;background:rgba(40,80,130,.7);border:1px solid rgba(110,180,255,.5);color:#cfe8ff;border-radius:5px;font-family:inherit}
+.bagui-toolbar button:hover{background:rgba(50,100,160,.8)}
 @media(max-width:768px){.bagui-main{flex-direction:column}.bagui-right{flex:1}}
 `;
 
@@ -106,11 +111,59 @@ close() {
 }
 
   refresh() {
-    if (!this.open) return;
-    this._renderLeft();
-    this._renderRight();
-    this._renderDetail();
+  if (!this.open) return;
+  this._renderLeft();
+  this._renderRight();
+  this._renderToolbar();
+  this._renderDetail();
+}
+
+_renderToolbar() {
+  let bar = document.getElementById('bagui-toolbar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'bagui-toolbar';
+    bar.className = 'bagui-toolbar';
+    const wrap = document.querySelector('.bagui-wrap');
+    if (!wrap) return;
+    const main = document.getElementById('bagui-left')?.parentNode;
+    if (main && main.parentNode === wrap) {
+      wrap.insertBefore(bar, main.nextSibling);
+    } else {
+      wrap.appendChild(bar);
+    }
   }
+  const isInMatch = this.engine.app && this.engine.app.world && this.engine.app.world.running;
+  const totalVal = this.inv.getTotalValue();
+  const carryVal = this.inv.getContainerValue('chest') + this.inv.getContainerValue('pocket') + this.inv.getContainerValue('bag');
+  const label = isInMatch
+    ? `携带 ${carryVal} cp`
+    : `仓库 ${this.inv.getContainerValue('stash')} cp · 总值 ${totalVal} cp`;
+  let html = `<span class="bagui-total">${label}</span>`;
+  if (!isInMatch) {
+    html += '<button id="bagui-stash-all">整理 · 全部入仓</button>';
+  }
+  bar.innerHTML = html;
+  const btn = document.getElementById('bagui-stash-all');
+  if (btn) btn.onclick = () => this._stashAll();
+}
+
+_stashAll() {
+  const containers = ['chest', 'pocket', 'bag'];
+  let moved = 0, failed = 0;
+  for (const cName of containers) {
+    const c = this.inv.containers[cName];
+    if (!c) continue;
+    const uids = c.uids.slice();
+    for (const uid of uids) {
+      const r = this.inv.addToContainer('stash', uid);
+      if (r.ok) moved++;
+      else failed++;
+    }
+  }
+  console.log('[BagUI] 整理完成：入仓', moved, '失败', failed);
+  this.refresh();
+}
 
   _renderLeft() {
     const el = document.getElementById('bagui-left');
@@ -170,11 +223,13 @@ const name = this.engine.i18n.t(rawName);
     const qty = item.qty > 1 ? `<span class="bagui-qty">×${item.qty}</span>` : '';
     const dur = item.durMax > 0 ? Math.round(item.dur / item.durMax * 100) : -1;
     const durBar = dur >= 0 ? `<div class="bagui-dur"><i style="width:${dur}%;background:${dur > 60 ? '#6fe07a' : dur > 30 ? '#ffd93d' : '#ff5a5a'}"></i></div>` : '';
-    return `<div class="bagui-slot has-item" data-uid="${uid}" ${srcAttrs}>
-      <div class="bagui-icon">${this._icon(item)}</div>
-      <div class="bagui-name">${this._esc(name)}</div>
-      ${qty}${durBar}
-    </div>`;
+    const val = inv.getItemValue(uid);
+const valBadge = val > 0 ? `<div class="bagui-val">${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val}</div>` : '';
+return `<div class="bagui-slot has-item" data-uid="${uid}" ${srcAttrs}>
+  <div class="bagui-icon">${this._icon(item)}</div>
+  <div class="bagui-name">${this._esc(name)}</div>
+  ${qty}${durBar}${valBadge}
+</div>`;
   }
 
 _icon(item) {
@@ -198,12 +253,35 @@ _icon(item) {
   _esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
 
   _bindSlotEvents(root) {
-    root.querySelectorAll('.bagui-slot.has-item').forEach(el => {
-      const uid = el.dataset.uid;
-      el.addEventListener('pointerdown', (e) => this._onDown(e, uid, el));
-      el.addEventListener('click', () => { if (!this._drag) { this.selectedUid = uid; this._renderDetail(); } });
-    });
+  root.querySelectorAll('.bagui-slot.has-item').forEach(el => {
+    const uid = el.dataset.uid;
+    el.addEventListener('pointerdown', (e) => this._onDown(e, uid, el));
+    el.addEventListener('click', () => { if (!this._drag) { this.selectedUid = uid; this._renderDetail(); } });
+    el.addEventListener('dblclick', (e) => { e.preventDefault(); this._quickEquip(uid); });
+  });
+}
+
+_quickEquip(uid) {
+  const item = this.inv.items.get(uid);
+  if (!item) return;
+  let targetSlot = null;
+  if (item.table === 'weapons') targetSlot = 'main';
+  else if (item.table === 'helmetShell') targetSlot = 'helmetShell';
+  else if (item.table === 'helmetVisor') targetSlot = 'helmetVisor';
+  else if (item.table === 'helmetEar') targetSlot = 'helmetEar';
+  else if (item.table === 'vestFiber') targetSlot = 'vestFiber';
+  else if (item.table === 'vestPlate') targetSlot = 'vestPlate';
+  else if (item.table === 'backpack') targetSlot = 'backpack';
+  else if (item.table === 'chestRig') targetSlot = 'chestRig';
+  if (!targetSlot) return;
+  const r = this.inv.equip(targetSlot, uid);
+  if (!r.ok) {
+    console.warn('[BagUI] 快速装备失败', uid, targetSlot, r.reason);
+    return;
   }
+  this.selectedUid = uid;
+  this.refresh();
+}
 
   _renderDetail() {
     const el = document.getElementById('bagui-detail');
@@ -215,9 +293,14 @@ _icon(item) {
     const rawDetailName = def.name || def.n || '?';
 const displayDetailName = this.engine.i18n.t(rawDetailName);
 let html = `<div class="bagui-detail-title">${this._esc(displayDetailName)}</div>`;
-    if (item.qty > 1) html += `<div>数量：${item.qty}</div>`;
-    if (item.durMax > 0) html += `<div>耐久：${Math.round(item.dur)}/${item.durMax}（${Math.round(item.dur / item.durMax * 100)}%）</div>`;
-    if (def.rpm) html += `<div>射速 ${def.rpm} RPM · 弹匣 ${def.mag || '—'}</div>`;
+const unitVal = this.inv.getItemValue(uid);
+if (item.qty > 1) {
+  const unit = Math.round(unitVal / item.qty);
+  html += `<div>数量：${item.qty}（单价 ${unit} cp · 总价 ${unitVal} cp）</div>`;
+} else if (unitVal > 0) {
+  html += `<div>价值：${unitVal} cp</div>`;
+}
+if (item.durMax > 0) html += `<div>耐久：${Math.round(item.dur)}/${item.durMax}（${Math.round(item.dur / item.durMax * 100)}%）</div>`;    if (def.rpm) html += `<div>射速 ${def.rpm} RPM · 弹匣 ${def.mag || '—'}</div>`;
     if (def.flavor) html += `<div class="bagui-flavor">「${this._esc(def.flavor)}」</div>`;
     if (item.attachments) {
       html += '<div class="bagui-attach-title">配件槽（拖配件到此）</div><div class="bagui-attach-grid">';
