@@ -58,13 +58,13 @@ const AMMO = {
      pellets:   每次射击弹丸数（霰弹 > 1）
      ========================================================== */
   const WEAPONS = {
-    p9:    { name: 'content.weapon.p9.name',    ammoType: '9mm',    rpm: 420, mag: 15, reload: 1.5, range: 80,  spread: 0.052, auto: false, pellets: 1, color: 0x6a6a7a },
-    smg45: { name: 'content.weapon.smg45.name', ammoType: '.45acp', rpm: 780, mag: 25, reload: 2.0, range: 60,  spread: 0.078, auto: true,  pellets: 1, color: 0x4a4a5a },
-    ar556: { name: 'content.weapon.ar556.name', ammoType: '5.56',   rpm: 700, mag: 30, reload: 2.3, range: 140, spread: 0.038, auto: true,  pellets: 1, color: 0x3a4a5a },
-    ak762: { name: 'content.weapon.ak762.name', ammoType: '7.62',   rpm: 620, mag: 30, reload: 2.6, range: 130, spread: 0.055, auto: true,  pellets: 1, color: 0x5a3a2a },
-    sr762: { name: 'content.weapon.sr762.name', ammoType: '7.62',   rpm: 55,  mag: 5,  reload: 3.2, range: 250, spread: 0.004, auto: false, pellets: 1, color: 0x2a3a4a },
-    sg12:  { name: 'content.weapon.sg12.name',  ammoType: '12ga',   rpm: 85,  mag: 6,  reload: 3.0, range: 35,  spread: 0.135, auto: false, pellets: 9, color: 0x5a4a2a },
-  };
+  p9:    { name: 'content.weapon.p9.name',    ammoType: '9mm',    rpm: 420, mag: 15, reload: 1.5, range: 80,  spread: 0.032, auto: false, pellets: 1, color: 0x6a6a7a },
+  smg45: { name: 'content.weapon.smg45.name', ammoType: '.45acp', rpm: 780, mag: 25, reload: 2.0, range: 60,  spread: 0.048, auto: true,  pellets: 1, color: 0x4a4a5a },
+  ar556: { name: 'content.weapon.ar556.name', ammoType: '5.56',   rpm: 700, mag: 30, reload: 2.3, range: 140, spread: 0.025, auto: true,  pellets: 1, color: 0x3a4a5a },
+  ak762: { name: 'content.weapon.ak762.name', ammoType: '7.62',   rpm: 620, mag: 30, reload: 2.6, range: 130, spread: 0.034, auto: true,  pellets: 1, color: 0x5a3a2a },
+  sr762: { name: 'content.weapon.sr762.name', ammoType: '7.62',   rpm: 55,  mag: 5,  reload: 3.2, range: 250, spread: 0.002, auto: false, pellets: 1, color: 0x2a3a4a },
+  sg12:  { name: 'content.weapon.sg12.name',  ammoType: '12ga',   rpm: 85,  mag: 6,  reload: 3.0, range: 35,  spread: 0.100, auto: false, pellets: 9, color: 0x5a4a2a },
+};
   c.registerAll('weapons', WEAPONS);
 
   /* ==========================================================
