@@ -386,6 +386,15 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
   <button class="btn ghost" id="btn-loadout-ticket">领 取 制 式 券</button>
 </div>
 
+<!-- 仓库 -->
+<div class="section">
+  <div class="section-label">
+    <span>仓库</span>
+    <span class="hint">快捷键 B · 拖拽配装 · 双击快速装备</span>
+  </div>
+  <button class="btn ghost" id="btn-stash">打 开 仓 库 / 配 装</button>
+</div>
+
 <!-- 陀螺仪设置 -->
     <div class="section">
       <div class="section-label">
@@ -501,10 +510,11 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
     </div>
 
     <!-- 8. 武器区 -->
-    <div id="bottom-right">
-      <div class="weapon-name" id="weapon-name"></div>
-      <div class="ammo-text"><span id="ammo-mag">0</span> / <span id="ammo-reserve">0</span></div>
-    </div>
+<div id="bottom-right">
+  <div class="weapon-name" id="weapon-name"></div>
+  <div class="ammo-text"><span id="ammo-mag">0</span> / <span id="ammo-reserve">0</span></div>
+  <div style="font-size:10px;color:var(--dim2);margin-top:4px;letter-spacing:1px">携带 <span id="carry-value" style="color:var(--gold);font-weight:700">0</span> cp</div>
+</div>
 
     <!-- 9. 防护按钮 -->
     <div id="protect-group">
