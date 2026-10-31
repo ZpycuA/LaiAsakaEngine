@@ -939,6 +939,29 @@ _buildWeaponFromInventory(inv, equipSlot) {
   };
 }
 
+
+_computeCarriedValue(){
+  const inv = this.engine.app ? this.engine.app.inventory : null;
+  if (!inv) return 0;
+  let total = 0;
+  for (const slot of ['main', 'side', 'helmetShell', 'helmetVisor', 'helmetEar', 'vestFiber', 'vestPlate', 'backpack', 'chestRig']) {
+    const uid = inv.equipped[slot];
+    if (uid) total += inv.getItemValue(uid);
+  }
+  for (const cName of ['chest', 'pocket', 'bag']) {
+    const c = inv.containers[cName];
+    if (!c) continue;
+    for (const uid of c.uids) total += inv.getItemValue(uid);
+  }
+  return total;
+}
+
+_computeLootValue(){
+  const current = this._computeCarriedValue();
+  const base = this._carriedValueBaseline || 0;
+  return Math.max(0, current - base);
+}
+
 _countAmmoInInventory(inv, ammoType) {
   if (!inv) return 0;
   let total = 0;
@@ -2545,14 +2568,22 @@ document.getElementById('btn-loadout-ticket')?.addEventListener('click', () => {
   alert('制式券已发放：' + charName + ' 标准配装。按 B 打开背包查看。');
 });
 
-  window.addEventListener('keydown', (ev) => {
+document.getElementById('btn-stash')?.addEventListener('click', () => {
+  if (this.bagUI) this.bagUI.toggle();
+});
+
+    window.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape' && this.world && this.world.running) {
     ev.preventDefault();
     this._togglePause();
   }
-  if (ev.key.toLowerCase() === 'b' && this.world && this.world.running && this.bagUI) {
-    ev.preventDefault();
-    this.bagUI.toggle();
+  if (ev.key.toLowerCase() === 'b' && this.bagUI && this.engine.save.data) {
+    const bootEl = document.getElementById('boot-screen');
+    const inBoot = bootEl && bootEl.classList.contains('on');
+    if (!inBoot) {
+      ev.preventDefault();
+      this.bagUI.toggle();
+    }
   }
 });
 
