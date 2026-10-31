@@ -3141,22 +3141,26 @@ _bindCameraControls() {
     return;
   }
   container.style.display = 'block';
-  if (container.children.length > 0) return;
 
-  // ★ 预留的可自定义键位表（以后只需读取存档更改 left/bottom 即可实现拖拽换位）
+  // 每次重建按钮，确保引用不丢
+  container.innerHTML = '';
+  this._mobileButtons = {};
+
   const layout = [
-    // 右手区域
-    { id: 'fire', label: '开火', right: '20px', bottom: '80px', size: 80, color: 'rgba(255,80,80,.4)', border: 'rgba(255,100,100,.8)' },
-    { id: 'jump', label: '跳跃', right: '120px', bottom: '40px', size: 60, color: 'rgba(80,255,150,.4)', border: 'rgba(100,255,150,.8)' },
-    { id: 'reload', label: '换弹', right: '20px', bottom: '180px', size: 60, color: 'rgba(200,200,200,.3)', border: 'rgba(255,255,255,.6)' },
-    // 左手区域（左下角开火）
-    { id: 'fire_left', label: '开火', left: '30px', bottom: '150px', size: 70, color: 'rgba(255,80,80,.3)', border: 'rgba(255,100,100,.6)' }
+    { id: 'fire',       label: '开火', right: '20px',  bottom: '80px',  size: 80, color: 'rgba(255,80,80,.4)',   border: 'rgba(255,100,100,.8)', mode: 'hold',  rotate: true },
+    { id: 'jump',       label: '跳跃', right: '120px', bottom: '40px',  size: 60, color: 'rgba(80,255,150,.4)',  border: 'rgba(100,255,150,.8)', mode: 'hold' },
+    { id: 'reload',     label: '换弹', right: '20px',  bottom: '180px', size: 60, color: 'rgba(200,200,200,.3)', border: 'rgba(255,255,255,.6)', mode: 'hold' },
+    { id: 'fire_left',  label: '开火', left:  '30px',  bottom: '150px', size: 70, color: 'rgba(255,80,80,.3)',   border: 'rgba(255,100,100,.6)', mode: 'hold',  rotate: true },
+    { id: 'bag',        label: '背包', right: '20px',  bottom: '260px', size: 55, color: 'rgba(80,140,255,.35)', border: 'rgba(120,180,255,.7)', mode: 'click' },
+    { id: 'search',     label: '搜索', right: '90px',  bottom: '180px', size: 55, color: 'rgba(255,210,80,.35)', border: 'rgba(255,210,80,.7)',  mode: 'click', conditional: 'search' },
   ];
 
   for (const btn of layout) {
     const el = document.createElement('div');
     el.className = 'mobile-btn';
-    // 根据配置决定是靠左还是靠右
+    el.dataset.actionId = btn.id;
+    if (btn.conditional === 'search') el.dataset.conditional = 'search';
+
     let posCss = '';
     if (btn.left) posCss += `left:${btn.left};`;
     if (btn.right) posCss += `right:${btn.right};`;
@@ -3167,34 +3171,68 @@ _bindCameraControls() {
       width:${btn.size}px;height:${btn.size}px;border-radius:50%;
       background:${btn.color};border:2px solid ${btn.border};
       color:#fff;display:flex;align-items:center;justify-content:center;
-      pointer-events:auto;font-weight:800;font-size:14px;
+      pointer-events:auto;font-weight:800;font-size:${Math.max(11, btn.size * 0.18)}px;
       user-select:none;-webkit-user-select:none;touch-action:none;
       box-shadow:0 4px 12px rgba(0,0,0,.4);z-index:36;
+      transition:opacity .2s, transform .1s;
     `;
     el.textContent = btn.label;
-    
-    // 映射到真正的输入状态
-    const actionId = btn.id === 'fire_left' ? 'fire' : btn.id;
-    el.style.pointerEvents = 'auto'; // 允许按钮被点击
-    el.style.touchAction = 'none';   // 阻止浏览器的默认触摸行为
+    if (btn.conditional === 'search') el.style.display = 'none';
 
-    el.addEventListener('pointerdown', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      this.engine.input.setActionState(actionId, true);
-      el.style.transform = 'scale(0.9)';
-    });
-    
-    const release = (e) => {
-      e.preventDefault(); e.stopPropagation();
-      this.engine.input.setActionState(actionId, false);
-      el.style.transform = 'scale(1)';
-    };
-    
-    el.addEventListener('pointerup', release);
-    el.addEventListener('pointercancel', release);
-    el.addEventListener('pointerleave', release);
-    
+    if (btn.mode === 'click') {
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        el.style.transform = 'scale(0.9)';
+        setTimeout(() => { el.style.transform = 'scale(1)'; }, 100);
+        if (btn.id === 'bag') {
+          if (this.bagUI) this.bagUI.toggle();
+        } else if (btn.id === 'search') {
+          this._trySearchContainer();
+        }
+      });
+    } else {
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        this.engine.input.setActionState(btn.id, true);
+        el.style.transform = 'scale(0.9)';
+        if (btn.rotate) {
+          el._dragPointerId = e.pointerId;
+          el._lastX = e.clientX;
+          el._lastY = e.clientY;
+          try { el.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+      });
+
+      if (btn.rotate) {
+        el.addEventListener('pointermove', (e) => {
+          if (el._dragPointerId !== e.pointerId) return;
+          const dx = e.clientX - el._lastX;
+          const dy = e.clientY - el._lastY;
+          el._lastX = e.clientX;
+          el._lastY = e.clientY;
+          if (Math.abs(dx) + Math.abs(dy) > 0.5) {
+            this.engine.cameraCtl.rotate(dx * 1.5, dy * 1.5);
+          }
+        });
+      }
+
+      const release = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        this.engine.input.setActionState(btn.id, false);
+        el.style.transform = 'scale(1)';
+        if (btn.rotate) el._dragPointerId = null;
+      };
+      el.addEventListener('pointerup', release);
+      el.addEventListener('pointercancel', release);
+      el.addEventListener('pointerleave', (e) => {
+        if (btn.rotate && el._dragPointerId === e.pointerId) return;
+        release(e);
+      });
+    }
+
+    this._mobileButtons[btn.id] = el;
     container.appendChild(el);
   }
 }
+ 
 }
