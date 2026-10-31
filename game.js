@@ -376,12 +376,16 @@ class HUDSystem {
     this._setText('cp-text', Math.round(cpPct) + '%');
   }
 
-  // 武器与弹药
-  if (p.weapon) {
-    this._setText('weapon-name', this.engine.i18n.t(p.weapon.def.name));
-    this._setText('ammo-mag', String(p.weapon.mag));
-    this._setText('ammo-reserve', String(p.weapon.reserve));
-  }
+ // 武器与弹药
+if (p.weapon) {
+  this._setText('weapon-name', this.engine.i18n.t(p.weapon.def.name));
+  this._setText('ammo-mag', String(p.weapon.mag));
+  this._setText('ammo-reserve', String(p.weapon.reserve));
+}
+
+if (p.carriedValue !== undefined) {
+  this._setText('carry-value', String(Math.round(p.carriedValue)));
+}
 
   // ★ 核心：受伤视觉状态机
   this._updateHurtFX(hpPct);
