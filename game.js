@@ -892,11 +892,14 @@ class GameWorld {
   };
   this.player.body.userData.ref = this.player;
 
-  // 将整个相机加入场景（否则相机子节点无法显示）
+   // 将整个相机加入场景（否则相机子节点无法显示）
   if (!this.engine.renderer.scene.children.includes(this.engine.renderer.camera)) {
     this.engine.renderer.scene.add(this.engine.renderer.camera);
   }
-}
+
+  this._carriedValueBaseline = this._computeCarriedValue();
+  this._carriedValueTimer = 0;
+  }
 
   _buildWeapon(id){
     const def = this.engine.content.get('weapons', id);
