@@ -85,8 +85,8 @@ export class Inventory {
       table,
       defId,
       qty: extras.qty || 1,
-      dur: extras.dur !== undefined ? extras.dur : (def.maxDur || 100),
-      durMax: def.maxDur || 100,
+      dur: extras.dur !== undefined ? extras.dur : (def.maxDur || 0),
+      durMax: def.maxDur || 0,
       attachments: null,
       subSlots: null,
     };
