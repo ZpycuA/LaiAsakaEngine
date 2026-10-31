@@ -1178,13 +1178,18 @@ this.containers.push({ x: cx, z: cz, mesh, body: cBody, opened: false, loot: nul
   this._syncMeshes();
 
   if (this.player) {
-    this.engine.cameraCtl.follow(
-      this.player.body.position.x, 
-      this.player.body.position.y + 1.5, 
-      this.player.body.position.z
-    );
+  this.engine.cameraCtl.follow(
+    this.player.body.position.x, 
+    this.player.body.position.y + 1.5, 
+    this.player.body.position.z
+  );
+  this._carriedValueTimer = (this._carriedValueTimer || 0) + dt;
+  if (this._carriedValueTimer > 0.5) {
+    this._carriedValueTimer = 0;
+    this.player.carriedValue = this._computeLootValue();
   }
-  this.hud.update();
+}
+this.hud.update();
 
   if (this.timeLimit > 0 && this.time >= this.timeLimit) {
     this._log('时间耗尽', 'r');
