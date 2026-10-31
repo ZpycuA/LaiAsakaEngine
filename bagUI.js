@@ -177,14 +177,21 @@ const name = this.engine.i18n.t(rawName);
     </div>`;
   }
 
-  _icon(item) {
+_icon(item) {
   if (!item) return '?';
   const def = this.inv.getDef(item);
-  const icon = (def && def.icon) || { weapons: '🔫', ammo: '🔸', ... }[item.table] || '?';
-  if (icon.startsWith('/') || icon.startsWith('http')) {
-    return `<img src="${this._esc(icon)}" style="width:100%;height:100%;object-fit:contain" alt="">`;
+  if (def && def.icon) {
+    const icon = String(def.icon);
+    if (icon.startsWith('/') || icon.startsWith('http') || icon.startsWith('data:')) {
+      return `<img src="${this._esc(icon)}" alt="" style="width:100%;height:100%;object-fit:contain">`;
+    }
+    return icon;
   }
-  return icon;
+  return {
+    weapons: '🔫', ammo: '🔸', cons: '💊', nade: '💣', attach: '⚙', valuable: '💎',
+    helmetShell: '⛑', helmetVisor: '🕶', helmetEar: '🎧',
+    vestFiber: '🦺', vestPlate: '🛡', backpack: '🎒', chestRig: '🧥'
+  }[item.table] || '?';
 }
 
   _cname(n) { return { chest: '胸挂', pocket: '口袋', bag: '背包', safe: '安全箱', stash: '仓库' }[n] || n; }
