@@ -198,6 +198,28 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
 .protect-btn.active{background:rgba(255,255,255,.22);box-shadow:0 0 16px currentColor}
 .protect-btn.dead{opacity:.22;pointer-events:none}
 
+/* 搜索提示 */
+#search-hint{position:absolute;left:50%;top:58%;transform:translateX(-50%);padding:7px 18px;border-radius:8px;background:rgba(20,32,46,.88);border:1px solid rgba(255,210,80,.55);color:#ffe8a8;font-size:12px;letter-spacing:1px;display:none;pointer-events:none;z-index:25}
+#search-hint.on{display:block}
+#search-hint b{color:#ffd93d}
+@media(max-width:768px){#search-hint{display:none!important}}
+
+/* 搜索面板 */
+#search-panel{position:absolute;inset:0;z-index:45;display:none;align-items:center;justify-content:center;background:rgba(4,8,14,.5);pointer-events:auto}
+#search-panel.on{display:flex}
+.search-box{width:90%;max-width:380px;max-height:72vh;background:rgba(14,22,34,.97);border:1px solid rgba(105,170,235,.45);border-radius:10px;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.7)}
+.search-header{padding:10px 14px;border-bottom:1px solid rgba(105,170,235,.25);display:flex;justify-content:space-between;align-items:center;color:#a8d8ff;font-size:13px;letter-spacing:2px;font-weight:700}
+.search-header button{width:26px;height:26px;border-radius:5px;background:rgba(60,100,150,.5);border:1px solid rgba(110,180,255,.4);color:#cfe8ff;cursor:pointer;font-size:13px;font-family:inherit}
+.search-body{flex:1;overflow-y:auto;padding:8px;min-height:100px;max-height:48vh}
+.search-empty{text-align:center;color:#5c82a8;padding:20px;font-size:12px}
+.search-item{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;margin-bottom:4px;background:rgba(20,32,46,.7);border-radius:5px;font-size:12px;color:#cfe4f8;animation:searchItemIn .3s ease-out}
+@keyframes searchItemIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+.search-item-take{padding:4px 12px;border-radius:4px;background:rgba(60,120,185,.5);border:1px solid rgba(120,190,255,.5);color:#e0f0ff;font-size:11px;cursor:pointer;font-family:inherit}
+.search-item-take:hover{background:rgba(80,150,220,.6)}
+.search-footer{padding:8px 14px;border-top:1px solid rgba(105,170,235,.25);display:flex;justify-content:flex-end}
+.search-footer button{padding:6px 18px;border-radius:5px;background:rgba(40,80,130,.7);border:1px solid rgba(110,180,255,.5);color:#cfe8ff;font-size:12px;cursor:pointer;font-family:inherit}
+.search-footer button:disabled{opacity:.4;cursor:default}
+
 /* 撤离进度 */
 #extract-progress{position:absolute;left:50%;top:18%;transform:translateX(-50%);display:none;text-align:center}
 #extract-progress.on{display:block}
@@ -205,6 +227,9 @@ canvas{display:block;position:absolute;inset:0;touch-action:none}
 .progress-bar{width:260px;height:8px;background:rgba(0,0,0,.7);border-radius:4px;overflow:hidden;border:1px solid rgba(120,220,255,.4)}
 #extract-fill{height:100%;width:0%;background:linear-gradient(90deg,#3fd0ff,#a2f0ff);transition:width .1s}
 
+<!-- 10.5 搜索提示 -->
+<div id="search-hint">按 <b>G</b> 搜索物资</div>
+   
 /* 暂停按钮 */
 #pause-btn{position:absolute;right:12px;top:160px;width:42px;height:42px;border-radius:50%;background:var(--panel);border:1px solid var(--line);color:var(--dim);font-size:14px;z-index:8;cursor:pointer;pointer-events:auto}
 #pause-btn:hover{color:var(--accent)}
